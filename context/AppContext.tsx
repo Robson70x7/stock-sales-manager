@@ -260,11 +260,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addSale = useCallback(async (saleData: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>): Promise<Sale> => {
     const now = new Date().toISOString();
     const sale: Sale = { ...saleData, id: generateId(), createdAt: now, updatedAt: now };
+    
+    // Debito automatico de estoque
+    const updatedProducts = state.products.map(product => {
+      const saleItem = sale.items.find(item => item.productId === product.id);
+      if (saleItem) {
+        return {
+          ...product,
+          stock: Math.max(0, product.stock - saleItem.quantity),
+          updatedAt: now,
+        };
+      }
+      return product;
+    });
+    
     dispatch({ type: 'ADD_SALE', payload: sale });
     const newSales = [...state.sales, sale];
     await AsyncStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
+    
+    // Salvar produtos com estoque atualizado
+    updatedProducts.forEach(p => {
+      if (state.products.find(sp => sp.id === p.id)?.stock !== p.stock) {
+        dispatch({ type: 'UPDATE_PRODUCT', payload: p });
+      }
+    });
+    await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+    
     return sale;
-  }, [state.sales]);
+  }, [state.sales, state.products]);
 
   const updateSale = useCallback(async (sale: Sale) => {
     const updated = { ...sale, updatedAt: new Date().toISOString() };

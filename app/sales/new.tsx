@@ -1,17 +1,18 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Modal, FlatList } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
+import { DatePickerField } from '@/components/ui/DatePickerField';
 import { generateInstallments, formatCurrency, getPaymentTypeLabel } from '@/lib/utils';
 import { PaymentType, SaleItem } from '@/types';
 
 const PAYMENT_TYPES: PaymentType[] = ['cash', 'pix', 'credit_card', 'debit_card', 'bank_transfer', 'installment'];
 
 export default function NewSaleScreen() {
-  const { state, addSale } = useApp();
+  const { state, addSale, addClient } = useApp();
   const colors = useColors();
   const router = useRouter();
 
@@ -26,6 +27,8 @@ export default function NewSaleScreen() {
   const [manualAmount, setManualAmount] = useState('');
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
+  const [showNewClient, setShowNewClient] = useState(false);
+  const [newClientName, setNewClientName] = useState('');
   const [saving, setSaving] = useState(false);
 
   const selectedClient = state.clients.find(c => c.id === selectedClientId);
@@ -126,21 +129,31 @@ export default function NewSaleScreen() {
               <TextInput style={[styles.input, { color: colors.foreground }]} value={description} onChangeText={setDescription} placeholder="Opcional" placeholderTextColor={colors.muted} multiline />
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <View style={styles.inputRow}>
-              <Text style={[styles.label, { color: colors.muted }]}>Data da Venda</Text>
-              <TextInput style={[styles.input, { color: colors.foreground }]} value={saleDate} onChangeText={setSaleDate} placeholder="AAAA-MM-DD" placeholderTextColor={colors.muted} keyboardType="numeric" />
-            </View>
+            <DatePickerField
+              label="Data da Venda"
+              value={saleDate}
+              onChange={setSaleDate}
+              placeholder="Selecione a data"
+            />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <View style={styles.inputRow}>
-              <Text style={[styles.label, { color: colors.muted }]}>Data da 1ª Parcela</Text>
-              <TextInput style={[styles.input, { color: colors.foreground }]} value={firstInstallmentDate} onChangeText={setFirstInstallmentDate} placeholder="AAAA-MM-DD" placeholderTextColor={colors.muted} keyboardType="numeric" />
-            </View>
+            <DatePickerField
+              label="Data da 1ª Parcela"
+              value={firstInstallmentDate}
+              onChange={setFirstInstallmentDate}
+              placeholder="Selecione a data"
+            />
           </View>
         </View>
 
         {/* Cliente */}
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Cliente</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Cliente</Text>
+            <Pressable onPress={() => setShowNewClient(true)} style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.primary + '20' }, pressed && { opacity: 0.7 }]}>
+              <MaterialIcons name="add" size={16} color={colors.primary} />
+              <Text style={[styles.addBtnText, { color: colors.primary }]}>Novo</Text>
+            </Pressable>
+          </View>
           <Pressable
             onPress={() => setShowClientPicker(true)}
             style={({ pressed }) => [styles.pickerBtn, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.7 }]}
@@ -311,6 +324,39 @@ export default function NewSaleScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Modal de novo cliente */}
+      <Modal visible={showNewClient} transparent animationType="slide" onRequestClose={() => setShowNewClient(false)}>
+        <Pressable style={styles.overlay} onPress={() => setShowNewClient(false)}>
+          <View style={[styles.pickerSheet, { backgroundColor: colors.surface }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Novo Cliente</Text>
+            <TextInput
+              style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 12 }]}
+              placeholder="Nome do cliente"
+              placeholderTextColor={colors.muted}
+              value={newClientName}
+              onChangeText={setNewClientName}
+              returnKeyType="done"
+            />
+            <Pressable
+              onPress={async () => {
+                if (!newClientName.trim()) {
+                  Alert.alert('Atencao', 'Informe o nome do cliente.');
+                  return;
+                }
+                const newClient = await addClient({ name: newClientName.trim(), tagIds: [] });
+                setSelectedClientId(newClient.id);
+                setNewClientName('');
+                setShowNewClient(false);
+              }}
+              style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+            >
+              <Text style={styles.saveBtnText}>Criar Cliente</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </ScrollView>
   );
 }
@@ -353,4 +399,5 @@ const styles = StyleSheet.create({
   pickerItem: { paddingVertical: 14, borderBottomWidth: 0.5, gap: 2 },
   pickerItemText: { fontSize: 15, fontWeight: '500' },
   pickerItemSub: { fontSize: 13 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 12 },
 });

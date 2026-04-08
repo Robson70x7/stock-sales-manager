@@ -73,11 +73,11 @@
 
 
 ## Melhorias Solicitadas (v1.2)
-- [ ] Adicionar data picker com calendário pt-br em todos os campos de data
+- [x] Adicionar data picker com calendário pt-br em todos os campos de data
 - [x] Campo de data da primeira parcela (separado da data de cadastro da venda)
 - [x] Remover campo "título" da venda e usar nome do produto como campo computado
-- [ ] Adicionar interface de seleção de tags em vendas e clientes
-- [ ] Implementar filtro por período e navegação por mês na tela de vendas
-- [ ] Implementar débito automático de estoque ao criar venda
-- [ ] Adicionar opção de criar cliente direto na tela de vendas (modal inline)
+- [x] Adicionar interface de seleção de tags em vendas e clientes (já implementada)
+- [x] Implementar filtro por período e navegação por mês na tela de vendas
+- [x] Implementar débito automático de estoque ao criar venda
+- [x] Adicionar opção de criar cliente direto na tela de vendas (modal inline)
 - [x] Implementar histórico de alterações para marcação de parcelas pagas

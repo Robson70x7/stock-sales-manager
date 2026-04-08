@@ -30,6 +30,8 @@ const STATUSES: { value: SaleStatus | 'all'; label: string }[] = [
   { value: 'cancelled', label: 'Cancelado' },
 ];
 
+const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+
 export default function SalesScreen() {
   const { state } = useApp();
   const colors = useColors();
@@ -39,8 +41,38 @@ export default function SalesScreen() {
   const [filterStatus, setFilterStatus] = useState<SaleStatus | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
 
+  const today = new Date();
+  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
+  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+
+  const handlePrevMonth = () => {
+    if (currentMonth === 0) {
+      setCurrentMonth(11);
+      setCurrentYear(currentYear - 1);
+    } else {
+      setCurrentMonth(currentMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (currentMonth === 11) {
+      setCurrentMonth(0);
+      setCurrentYear(currentYear + 1);
+    } else {
+      setCurrentMonth(currentMonth + 1);
+    }
+  };
+
+  const isInMonth = (dateStr: string, year: number, month: number) => {
+    const date = new Date(dateStr);
+    return date.getFullYear() === year && date.getMonth() === month;
+  };
+
   const filtered = useMemo(() => {
-    let result = [...state.sales].sort((a, b) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime());
+    let result = [...state.sales]
+      .filter(s => isInMonth(s.saleDate, currentYear, currentMonth))
+      .sort((a, b) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime());
+
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(s =>
@@ -53,7 +85,7 @@ export default function SalesScreen() {
     if (filterPayment !== 'all') result = result.filter(s => s.paymentType === filterPayment);
     if (filterStatus !== 'all') result = result.filter(s => s.status === filterStatus);
     return result;
-  }, [state.sales, state.tags, search, filterPayment, filterStatus]);
+  }, [state.sales, state.tags, search, filterPayment, filterStatus, currentMonth, currentYear]);
 
   const hasFilters = filterPayment !== 'all' || filterStatus !== 'all';
 
@@ -111,6 +143,19 @@ export default function SalesScreen() {
         >
           <MaterialIcons name="filter-list" size={20} color={hasFilters ? colors.primary : colors.muted} />
           {hasFilters && <View style={[styles.filterDot, { backgroundColor: colors.primary }]} />}
+        </Pressable>
+      </View>
+
+      {/* Navegação por mês */}
+      <View style={[styles.monthNav, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <Pressable onPress={handlePrevMonth} style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.6 }]}>
+          <MaterialIcons name="chevron-left" size={24} color={colors.primary} />
+        </Pressable>
+        <Text style={[styles.monthText, { color: colors.foreground }]}>
+          {MONTHS[currentMonth]} {currentYear}
+        </Text>
+        <Pressable onPress={handleNextMonth} style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.6 }]}>
+          <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
         </Pressable>
       </View>
 
@@ -218,6 +263,9 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: '700' },
   filterBtn: { padding: 8, borderRadius: 8, position: 'relative' },
   filterDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
+  monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5 },
+  navBtn: { padding: 8 },
+  monthText: { fontSize: 16, fontWeight: '600' },
   searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 10, borderBottomWidth: 0.5 },
   searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
   activeFilters: { maxHeight: 50 },
