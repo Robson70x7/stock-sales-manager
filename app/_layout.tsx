@@ -1,4 +1,5 @@
 import "@/global.css";
+import { AppProvider } from "@/context/AppContext";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -85,10 +86,23 @@ export default function RootLayout() {
           {/* Default to hiding native headers so raw route segments don't appear (e.g. "(tabs)", "products/[id]"). */}
           {/* If a screen needs the native header, explicitly enable it and set a human title via Stack.Screen options. */}
           {/* in order for ios apps tab switching to work properly, use presentation: "fullScreenModal" for login page, whenever you decide to use presentation: "modal*/}
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="oauth/callback" />
-          </Stack>
+          <AppProvider>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="oauth/callback" />
+              <Stack.Screen name="sales/new" options={{ title: "Nova Venda", presentation: "fullScreenModal", headerShown: true }} />
+              <Stack.Screen name="sales/[id]" options={{ title: "Detalhes da Venda", headerShown: true }} />
+              <Stack.Screen name="sales/edit/[id]" options={{ title: "Editar Venda", presentation: "fullScreenModal", headerShown: true }} />
+              <Stack.Screen name="products/new" options={{ title: "Novo Produto", presentation: "fullScreenModal", headerShown: true }} />
+              <Stack.Screen name="products/[id]" options={{ title: "Detalhes do Produto", headerShown: true }} />
+              <Stack.Screen name="products/edit/[id]" options={{ title: "Editar Produto", presentation: "fullScreenModal", headerShown: true }} />
+              <Stack.Screen name="clients/new" options={{ title: "Novo Cliente", presentation: "fullScreenModal", headerShown: true }} />
+              <Stack.Screen name="clients/[id]" options={{ title: "Detalhes do Cliente", headerShown: true }} />
+              <Stack.Screen name="clients/edit/[id]" options={{ title: "Editar Cliente", presentation: "fullScreenModal", headerShown: true }} />
+              <Stack.Screen name="tags/index" options={{ title: "Tags", headerShown: true }} />
+              <Stack.Screen name="tags/[id]" options={{ title: "Detalhes da Tag", headerShown: true }} />
+            </Stack>
+          </AppProvider>
           <StatusBar style="auto" />
         </QueryClientProvider>
       </trpc.Provider>
