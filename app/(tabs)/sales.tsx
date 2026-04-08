@@ -44,7 +44,7 @@ export default function SalesScreen() {
     if (search) {
       const q = search.toLowerCase();
       result = result.filter(s =>
-        s.title.toLowerCase().includes(q) ||
+        s.items.some(i => i.productName.toLowerCase().includes(q)) ||
         (s.description?.toLowerCase().includes(q)) ||
         (s.clientName?.toLowerCase().includes(q)) ||
         state.tags.filter(t => s.tagIds.includes(t.id)).some(t => t.name.toLowerCase().includes(q))
@@ -68,7 +68,7 @@ export default function SalesScreen() {
       >
         <View style={styles.cardTop}>
           <View style={styles.cardLeft}>
-            <Text style={[styles.saleTitle, { color: colors.foreground }]} numberOfLines={1}>{item.title}</Text>
+            <Text style={[styles.saleTitle, { color: colors.foreground }]} numberOfLines={1}>{item.items[0]?.productName || 'Venda'}</Text>
             {item.clientName && (
               <View style={styles.clientRow}>
                 <MaterialIcons name="person" size={12} color={colors.muted} />

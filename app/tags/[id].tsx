@@ -106,7 +106,7 @@ export default function TagDetailScreen() {
                   <MaterialIcons name="shopping-cart" size={18} color={tag.color} />
                 </View>
                 <View style={styles.itemInfo}>
-                  <Text style={[styles.itemName, { color: colors.foreground }]} numberOfLines={1}>{sale.title}</Text>
+                  <Text style={[styles.itemName, { color: colors.foreground }]} numberOfLines={1}>{sale.items[0]?.productName || 'Venda'}</Text>
                   <Text style={[styles.itemSub, { color: colors.muted }]}>
                     {formatDate(sale.saleDate)}{sale.clientName ? ` · ${sale.clientName}` : ''}
                   </Text>

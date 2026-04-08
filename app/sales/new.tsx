@@ -15,12 +15,12 @@ export default function NewSaleScreen() {
   const colors = useColors();
   const router = useRouter();
 
-  const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>();
   const [paymentType, setPaymentType] = useState<PaymentType>('cash');
   const [installmentsCount, setInstallmentsCount] = useState(1);
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
+  const [firstInstallmentDate, setFirstInstallmentDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [items, setItems] = useState<SaleItem[]>([]);
   const [manualAmount, setManualAmount] = useState('');
@@ -68,7 +68,6 @@ export default function NewSaleScreen() {
   };
 
   const handleSave = async () => {
-    if (!title.trim()) { Alert.alert('Atenção', 'Informe um título para a venda.'); return; }
     if (totalAmount <= 0) { Alert.alert('Atenção', 'Informe o valor da venda.'); return; }
 
     setSaving(true);
@@ -77,19 +76,23 @@ export default function NewSaleScreen() {
       const isInstallment = paymentType === 'installment' || installmentsCount > 1;
       const count = isInstallment ? installmentsCount : 1;
       const installments = count > 1
-        ? generateInstallments(saleId, totalAmount, count, saleDate)
+        ? generateInstallments(saleId, totalAmount, count, firstInstallmentDate)
         : [{
             id: Date.now().toString(36) + 'i',
             saleId,
             number: 1,
             totalInstallments: 1,
             amount: totalAmount,
-            dueDate: saleDate,
+            dueDate: firstInstallmentDate,
             status: 'pending' as const,
+            history: [{
+              date: new Date().toISOString(),
+              status: 'pending' as const,
+              notes: 'Parcela criada',
+            }],
           }];
 
       await addSale({
-        title: title.trim(),
         description: description.trim() || undefined,
         clientId: selectedClientId,
         clientName: selectedClient?.name,
@@ -101,6 +104,7 @@ export default function NewSaleScreen() {
         installments,
         tagIds: selectedTagIds,
         saleDate: new Date(saleDate).toISOString(),
+        firstInstallmentDate: new Date(firstInstallmentDate).toISOString(),
       });
       router.back();
     } catch (e) {
@@ -118,18 +122,18 @@ export default function NewSaleScreen() {
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Informações</Text>
           <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.inputRow}>
-              <Text style={[styles.label, { color: colors.muted }]}>Título *</Text>
-              <TextInput style={[styles.input, { color: colors.foreground }]} value={title} onChangeText={setTitle} placeholder="Ex: Venda de produtos" placeholderTextColor={colors.muted} returnKeyType="next" />
-            </View>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <View style={styles.inputRow}>
               <Text style={[styles.label, { color: colors.muted }]}>Descrição</Text>
               <TextInput style={[styles.input, { color: colors.foreground }]} value={description} onChangeText={setDescription} placeholder="Opcional" placeholderTextColor={colors.muted} multiline />
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={styles.inputRow}>
-              <Text style={[styles.label, { color: colors.muted }]}>Data</Text>
+              <Text style={[styles.label, { color: colors.muted }]}>Data da Venda</Text>
               <TextInput style={[styles.input, { color: colors.foreground }]} value={saleDate} onChangeText={setSaleDate} placeholder="AAAA-MM-DD" placeholderTextColor={colors.muted} keyboardType="numeric" />
+            </View>
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
+            <View style={styles.inputRow}>
+              <Text style={[styles.label, { color: colors.muted }]}>Data da 1ª Parcela</Text>
+              <TextInput style={[styles.input, { color: colors.foreground }]} value={firstInstallmentDate} onChangeText={setFirstInstallmentDate} placeholder="AAAA-MM-DD" placeholderTextColor={colors.muted} keyboardType="numeric" />
             </View>
           </View>
         </View>

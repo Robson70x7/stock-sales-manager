@@ -48,6 +48,12 @@ export interface SaleItem {
   totalPrice: number;
 }
 
+export interface InstallmentHistory {
+  date: string;
+  status: InstallmentStatus;
+  notes?: string;
+}
+
 export interface Installment {
   id: string;
   saleId: string;
@@ -57,13 +63,13 @@ export interface Installment {
   dueDate: string;
   paidDate?: string;
   status: InstallmentStatus;
+  history: InstallmentHistory[];
 }
 
 export interface Sale {
   id: string;
   clientId?: string;
   clientName?: string;
-  title: string;
   description?: string;
   items: SaleItem[];
   totalAmount: number;
@@ -73,6 +79,7 @@ export interface Sale {
   installments: Installment[];
   tagIds: string[];
   saleDate: string;
+  firstInstallmentDate: string; // Data da primeira parcela
   createdAt: string;
   updatedAt: string;
 }

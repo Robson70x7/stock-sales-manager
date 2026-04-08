@@ -53,7 +53,7 @@ export default function SaleDetailScreen() {
         <View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={styles.heroTop}>
             <View style={styles.heroInfo}>
-              <Text style={[styles.saleTitle, { color: colors.foreground }]}>{sale.title}</Text>
+              <Text style={[styles.saleTitle, { color: colors.foreground }]}>{sale.items[0]?.productName || 'Venda'}</Text>
               {sale.clientName && (
                 <View style={styles.clientRow}>
                   <MaterialIcons name="person" size={14} color={colors.muted} />
@@ -166,7 +166,7 @@ export default function SaleDetailScreen() {
       <ConfirmDialog
         visible={showDelete}
         title="Excluir Venda"
-        message={`Deseja excluir "${sale.title}"? Esta ação não pode ser desfeita.`}
+        message={`Deseja excluir esta venda? Esta ação não pode ser desfeita.`}
         confirmLabel="Excluir"
         destructive
         onConfirm={handleDelete}

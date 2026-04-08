@@ -107,7 +107,7 @@ export default function ClientDetailScreen() {
                 style={({ pressed }) => [styles.saleRow, { borderTopColor: colors.border }, pressed && { opacity: 0.7 }]}
               >
                 <View style={styles.saleInfo}>
-                  <Text style={[styles.saleTitle, { color: colors.foreground }]} numberOfLines={1}>{sale.title}</Text>
+                  <Text style={[styles.saleTitle, { color: colors.foreground }]} numberOfLines={1}>{sale.items[0]?.productName || 'Venda'}</Text>
                   <Text style={[styles.saleDate, { color: colors.muted }]}>{formatDate(sale.saleDate)}</Text>
                 </View>
                 <View style={styles.saleRight}>

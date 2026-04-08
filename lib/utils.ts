@@ -116,6 +116,11 @@ export function generateInstallments(
       amount: Math.round(installmentAmount * 100) / 100,
       dueDate: dueDate.toISOString(),
       status: 'pending' as const,
+      history: [{
+        date: new Date().toISOString(),
+        status: 'pending' as const,
+        notes: 'Parcela criada',
+      }],
     };
   });
 }

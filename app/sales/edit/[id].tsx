@@ -23,7 +23,6 @@ export default function EditSaleScreen() {
   const router = useRouter();
 
   const sale = state.sales.find(s => s.id === id);
-  const [title, setTitle] = useState(sale?.title || '');
   const [description, setDescription] = useState(sale?.description || '');
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>(sale?.clientId);
   const [paymentType, setPaymentType] = useState<PaymentType>(sale?.paymentType || 'cash');
@@ -42,12 +41,10 @@ export default function EditSaleScreen() {
   };
 
   const handleSave = async () => {
-    if (!title.trim()) { Alert.alert('Atenção', 'Informe o título da venda.'); return; }
     setSaving(true);
     try {
       await updateSale({
         ...sale,
-        title: title.trim(),
         description: description.trim() || undefined,
         clientId: selectedClientId,
         clientName: selectedClient?.name,
@@ -70,11 +67,6 @@ export default function EditSaleScreen() {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Informações</Text>
           <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={styles.inputRow}>
-              <Text style={[styles.label, { color: colors.muted }]}>Título *</Text>
-              <TextInput style={[styles.input, { color: colors.foreground }]} value={title} onChangeText={setTitle} placeholder="Título da venda" placeholderTextColor={colors.muted} />
-            </View>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={styles.inputRow}>
               <Text style={[styles.label, { color: colors.muted }]}>Descrição</Text>
               <TextInput style={[styles.input, { color: colors.foreground }]} value={description} onChangeText={setDescription} placeholder="Opcional" placeholderTextColor={colors.muted} multiline />
