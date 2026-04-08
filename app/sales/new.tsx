@@ -209,7 +209,7 @@ export default function NewSaleScreen() {
             {PAYMENT_TYPES.map(pt => (
               <Pressable
                 key={pt}
-                onPress={() => { setPaymentType(pt); if (pt !== 'installment') setInstallmentsCount(1); }}
+                onPress={() => setPaymentType(pt)}
                 style={[styles.paymentOption, { borderColor: colors.border }, paymentType === pt && { backgroundColor: colors.primary, borderColor: colors.primary }]}
               >
                 <Text style={[styles.paymentText, { color: paymentType === pt ? '#fff' : colors.foreground }]}>{getPaymentTypeLabel(pt)}</Text>
@@ -217,45 +217,27 @@ export default function NewSaleScreen() {
             ))}
           </ScrollView>
 
-          {(paymentType === 'installment' || installmentsCount > 1) && (
-            <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
-              <View style={styles.inputRow}>
-                <Text style={[styles.label, { color: colors.muted }]}>Nº de Parcelas</Text>
-                <View style={styles.qtyControl}>
-                  <Pressable onPress={() => setInstallmentsCount(Math.max(1, installmentsCount - 1))} style={styles.qtyBtn}>
-                    <MaterialIcons name="remove" size={16} color={colors.primary} />
-                  </Pressable>
-                  <Text style={[styles.qtyText, { color: colors.foreground }]}>{installmentsCount}x</Text>
-                  <Pressable onPress={() => setInstallmentsCount(Math.min(60, installmentsCount + 1))} style={styles.qtyBtn}>
-                    <MaterialIcons name="add" size={16} color={colors.primary} />
-                  </Pressable>
-                </View>
-              </View>
-              {totalAmount > 0 && installmentsCount > 1 && (
-                <View style={styles.inputRow}>
-                  <Text style={[styles.label, { color: colors.muted }]}>Valor por Parcela</Text>
-                  <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>{formatCurrency(totalAmount / installmentsCount)}</Text>
-                </View>
-              )}
-            </View>
-          )}
-
-          {paymentType === 'credit_card' && (
-            <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
-              <View style={styles.inputRow}>
-                <Text style={[styles.label, { color: colors.muted }]}>Parcelas</Text>
-                <View style={styles.qtyControl}>
-                  <Pressable onPress={() => setInstallmentsCount(Math.max(1, installmentsCount - 1))} style={styles.qtyBtn}>
-                    <MaterialIcons name="remove" size={16} color={colors.primary} />
-                  </Pressable>
-                  <Text style={[styles.qtyText, { color: colors.foreground }]}>{installmentsCount}x</Text>
-                  <Pressable onPress={() => setInstallmentsCount(Math.min(12, installmentsCount + 1))} style={styles.qtyBtn}>
-                    <MaterialIcons name="add" size={16} color={colors.primary} />
-                  </Pressable>
-                </View>
+          {/* Opção de parcelas para qualquer modalidade de pagamento */}
+          <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
+            <View style={styles.inputRow}>
+              <Text style={[styles.label, { color: colors.muted }]}>Nº de Parcelas</Text>
+              <View style={styles.qtyControl}>
+                <Pressable onPress={() => setInstallmentsCount(Math.max(1, installmentsCount - 1))} style={styles.qtyBtn}>
+                  <MaterialIcons name="remove" size={16} color={colors.primary} />
+                </Pressable>
+                <Text style={[styles.qtyText, { color: colors.foreground }]}>{installmentsCount}x</Text>
+                <Pressable onPress={() => setInstallmentsCount(Math.min(60, installmentsCount + 1))} style={styles.qtyBtn}>
+                  <MaterialIcons name="add" size={16} color={colors.primary} />
+                </Pressable>
               </View>
             </View>
-          )}
+            {totalAmount > 0 && installmentsCount > 1 && (
+              <View style={styles.inputRow}>
+                <Text style={[styles.label, { color: colors.muted }]}>Valor por Parcela</Text>
+                <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>{formatCurrency(totalAmount / installmentsCount)}</Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Tags */}

@@ -66,3 +66,7 @@
 - [x] Formatação de moeda (BRL)
 - [x] Suporte a dark mode
 - [x] Testes unitários (39 testes passando)
+
+## Melhorias Solicitadas (v1.1)
+- [x] Permitir parcelas em todas as modalidades de pagamento (dinheiro, PIX, débito, transferência, crédito)
+- [x] Exibir mês/ano (MM/YY) no título da tela de Resumo entre as setas de navegação

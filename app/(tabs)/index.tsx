@@ -219,12 +219,12 @@ export default function HomeScreen() {
         <Pressable onPress={() => navigateMonth('prev')} style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.6 }]}>
           <MaterialIcons name="chevron-left" size={28} color={colors.primary} />
         </Pressable>
-        <Pressable onPress={() => { setCurrentYear(now.getFullYear()); setCurrentMonth(now.getMonth()); }} style={styles.monthTitle}>
+        <View style={styles.monthTitle}>
           <Text style={[styles.monthText, { color: colors.foreground }]}>
-            {getMonthName(currentMonth)} {currentYear}
+            {String(currentMonth + 1).padStart(2, '0')}/{String(currentYear).slice(-2)}
           </Text>
           {isCurrentMonth && <View style={[styles.currentDot, { backgroundColor: colors.primary }]} />}
-        </Pressable>
+        </View>
         <Pressable onPress={() => navigateMonth('next')} style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.6 }]}>
           <MaterialIcons name="chevron-right" size={28} color={colors.primary} />
         </Pressable>
