@@ -81,3 +81,10 @@
 - [x] Implementar débito automático de estoque ao criar venda
 - [x] Adicionar opção de criar cliente direto na tela de vendas (modal inline)
 - [x] Implementar histórico de alterações para marcação de parcelas pagas
+
+
+## Correções (v1.3)
+- [x] Corrigir backgrounds brancos em modais e componentes para tema escuro
+- [x] Corrigir problema de data com 1 dia atrasado (timezone/UTC)
+- [x] Adicionar validação de estoque (não permitir quantidade maior que disponível)
+- [x] Mudar formato de datas no título para mês abreviado (Jan 2026, Fev 2026, etc)

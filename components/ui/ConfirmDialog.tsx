@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
+import { useColors } from '@/hooks/use-colors';
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -22,28 +23,34 @@ export function ConfirmDialog({
   onCancel,
   destructive = false,
 }: ConfirmDialogProps) {
+  const colors = useColors();
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <Pressable style={styles.overlay} onPress={onCancel}>
-        <View style={styles.dialog}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.message}>{message}</Text>
+        <View style={[styles.dialog, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
+          <Text style={[styles.message, { color: colors.muted }]}>{message}</Text>
           <View style={styles.buttons}>
             <Pressable
               onPress={onCancel}
-              style={({ pressed }) => [styles.btn, styles.cancelBtn, pressed && { opacity: 0.7 }]}
+              style={({ pressed }) => [
+                styles.btn,
+                { backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1 },
+                pressed && { opacity: 0.7 },
+              ]}
             >
-              <Text style={styles.cancelText}>{cancelLabel}</Text>
+              <Text style={[styles.cancelText, { color: colors.muted }]}>{cancelLabel}</Text>
             </Pressable>
             <Pressable
               onPress={onConfirm}
               style={({ pressed }) => [
                 styles.btn,
-                destructive ? styles.destructiveBtn : styles.confirmBtn,
+                destructive ? { backgroundColor: '#DC2626' } : { backgroundColor: colors.primary },
                 pressed && { opacity: 0.7 },
               ]}
             >
-              <Text style={[styles.confirmText, destructive && { color: '#fff' }]}>{confirmLabel}</Text>
+              <Text style={[styles.confirmText, { color: '#fff' }]}>{confirmLabel}</Text>
             </Pressable>
           </View>
         </View>
@@ -61,7 +68,6 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   dialog: {
-    backgroundColor: '#fff',
     borderRadius: 16,
     padding: 24,
     width: '100%',
@@ -72,13 +78,10 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 10,
   },
-  title: { fontSize: 18, fontWeight: '700', color: '#0F172A', marginBottom: 8 },
-  message: { fontSize: 14, color: '#64748B', lineHeight: 20, marginBottom: 20 },
+  title: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
+  message: { fontSize: 14, lineHeight: 20, marginBottom: 20 },
   buttons: { flexDirection: 'row', gap: 12 },
   btn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
-  cancelBtn: { backgroundColor: '#F1F5F9' },
-  confirmBtn: { backgroundColor: '#2563EB' },
-  destructiveBtn: { backgroundColor: '#DC2626' },
-  cancelText: { fontSize: 14, fontWeight: '600', color: '#64748B' },
+  cancelText: { fontSize: 14, fontWeight: '600' },
   confirmText: { fontSize: 14, fontWeight: '600', color: '#fff' },
 });

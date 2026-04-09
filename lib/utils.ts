@@ -17,23 +17,30 @@ export function formatCurrency(value: number): string {
 // Formata data para exibição
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  // Adiciona o offset do timezone local para corrigir o problema de 1 dia atrasado
+  const offset = date.getTimezoneOffset() * 60000;
+  const localDate = new Date(date.getTime() + offset);
+  return localDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 // Formata data curta (dd/mm)
 export function formatShortDate(dateStr: string): string {
   const date = new Date(dateStr);
-  return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  // Adiciona o offset do timezone local para corrigir o problema de 1 dia atrasado
+  const offset = date.getTimezoneOffset() * 60000;
+  const localDate = new Date(date.getTime() + offset);
+  return localDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 }
 
 // Nome do mês em português
-export function getMonthName(month: number, short = false): string {
+export function getMonthName(month: number, short = false, year?: number): string {
   const months = [
     'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
   ];
   const shortMonths = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-  return short ? shortMonths[month] : months[month];
+  const monthName = short ? shortMonths[month] : months[month];
+  return year ? `${monthName} ${year}` : monthName;
 }
 
 // Label do tipo de pagamento
@@ -128,7 +135,10 @@ export function generateInstallments(
 // Verifica se uma data está no mês/ano especificado
 export function isInMonth(dateStr: string, year: number, month: number): boolean {
   const date = new Date(dateStr);
-  return date.getFullYear() === year && date.getMonth() === month;
+  // Adiciona o offset do timezone local para corrigir o problema de 1 dia atrasado
+  const offset = date.getTimezoneOffset() * 60000;
+  const localDate = new Date(date.getTime() + offset);
+  return localDate.getFullYear() === year && localDate.getMonth() === month;
 }
 
 // Obtém iniciais do nome

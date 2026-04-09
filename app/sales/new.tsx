@@ -43,10 +43,19 @@ export default function NewSaleScreen() {
   const addProduct = (productId: string) => {
     const product = state.products.find(p => p.id === productId);
     if (!product) return;
+    
     const existing = items.find(i => i.productId === productId);
+    const currentQty = existing ? existing.quantity : 0;
+    const newQty = currentQty + 1;
+    
+    if (newQty > product.stock) {
+      Alert.alert('Estoque Insuficiente', `Apenas ${product.stock} unidade(s) disponivel(is) de "${product.name}".`);
+      return;
+    }
+    
     if (existing) {
       setItems(items.map(i => i.productId === productId
-        ? { ...i, quantity: i.quantity + 1, totalPrice: (i.quantity + 1) * i.unitPrice }
+        ? { ...i, quantity: newQty, totalPrice: newQty * i.unitPrice }
         : i
       ));
     } else {
@@ -67,6 +76,15 @@ export default function NewSaleScreen() {
 
   const updateItemQty = (productId: string, qty: number) => {
     if (qty <= 0) { removeItem(productId); return; }
+    
+    const product = state.products.find(p => p.id === productId);
+    if (!product) return;
+    
+    if (qty > product.stock) {
+      Alert.alert('Estoque Insuficiente', `Apenas ${product.stock} unidade(s) disponivel(is) de "${product.name}".`);
+      return;
+    }
+    
     setItems(items.map(i => i.productId === productId ? { ...i, quantity: qty, totalPrice: qty * i.unitPrice } : i));
   };
 

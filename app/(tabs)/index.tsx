@@ -221,7 +221,7 @@ export default function HomeScreen() {
         </Pressable>
         <View style={styles.monthTitle}>
           <Text style={[styles.monthText, { color: colors.foreground }]}>
-            {String(currentMonth + 1).padStart(2, '0')}/{String(currentYear).slice(-2)}
+            {getMonthName(currentMonth, true, currentYear)}
           </Text>
           {isCurrentMonth && <View style={[styles.currentDot, { backgroundColor: colors.primary }]} />}
         </View>
@@ -373,7 +373,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: '#1E293B',
   },
   allChipText: { fontSize: 12, fontWeight: '600' },
   list: { paddingHorizontal: 16, paddingBottom: 100 },
