@@ -35,7 +35,7 @@ export default function ProductDetailScreen() {
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.content}>
         <View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={[styles.iconCircle, { backgroundColor: '#EFF6FF' }]}>
+          <View style={[styles.iconCircle, { backgroundColor: '#1E293B' }]}>
             <MaterialIcons name="inventory" size={32} color={colors.primary} />
           </View>
           <Text style={[styles.productName, { color: colors.foreground }]}>{product.name}</Text>

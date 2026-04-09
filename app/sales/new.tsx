@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
   itemName: { fontSize: 14, fontWeight: '500' },
   itemPrice: { fontSize: 12, marginTop: 2 },
   qtyControl: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  qtyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center' },
+  qtyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' },
   qtyText: { fontSize: 14, fontWeight: '600', minWidth: 24, textAlign: 'center' },
   itemTotal: { fontSize: 14, fontWeight: '600', minWidth: 70, textAlign: 'right' },
   totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 12, borderRadius: 10 },
@@ -417,5 +417,5 @@ const styles = StyleSheet.create({
   pickerItem: { paddingVertical: 14, borderBottomWidth: 0.5, gap: 2 },
   pickerItemText: { fontSize: 15, fontWeight: '500' },
   pickerItemSub: { fontSize: 13 },
-  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#E2E8F0', alignSelf: 'center', marginBottom: 12 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#475569', alignSelf: 'center', marginBottom: 12 },
 });
