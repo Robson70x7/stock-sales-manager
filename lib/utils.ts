@@ -112,16 +112,22 @@ export function generateInstallments(
 ): import('@/types').Installment[] {
   const installmentAmount = totalAmount / count;
   const start = new Date(startDate);
+  // Corrigir timezone: adicionar offset para manter a data local correta
+  const offset = start.getTimezoneOffset() * 60000;
+  const localStart = new Date(start.getTime() + offset);
+  
   return Array.from({ length: count }, (_, i) => {
-    const dueDate = new Date(start);
+    const dueDate = new Date(localStart);
     dueDate.setMonth(dueDate.getMonth() + i);
+    // Remover o offset ao converter de volta para ISO para armazenar corretamente
+    const utcDueDate = new Date(dueDate.getTime() - offset);
     return {
       id: generateId(),
       saleId,
       number: i + 1,
       totalInstallments: count,
       amount: Math.round(installmentAmount * 100) / 100,
-      dueDate: dueDate.toISOString(),
+      dueDate: utcDueDate.toISOString(),
       status: 'pending' as const,
       history: [{
         date: new Date().toISOString(),

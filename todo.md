@@ -104,3 +104,7 @@
 - [x] Modal de novo cliente fecha ao focar em input
 - [x] Imagem de produto perdida ao recarregar página (persistência)
 - [x] Devolução de estoque não adiciona quantidade corretamente ao excluir venda
+
+
+## Bugs Encontrados (v1.6.1) — CORRIGIDO
+- [x] Vendas com parcelas não aparecem em meses diferentes da data de criação (filtro de mês)

@@ -11,6 +11,7 @@ import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
 import { formatCurrency, formatDate, getPaymentTypeLabel, getSaleStatusColor } from '@/lib/utils';
 import { Sale, PaymentType, SaleStatus } from '@/types';
+import { isInMonth as isInMonthUtil } from '@/lib/utils';
 
 const PAYMENT_TYPES: { value: PaymentType | 'all'; label: string }[] = [
   { value: 'all', label: 'Todos' },
@@ -68,9 +69,15 @@ export default function SalesScreen() {
     return date.getFullYear() === year && date.getMonth() === month;
   };
 
+  // Verifica se uma venda tem parcelas no mês especificado
+  const hasParcelsInMonth = (sale: Sale, year: number, month: number): boolean => {
+    if (sale.installmentsCount <= 1) return false;
+    return sale.installments.some(inst => isInMonth(inst.dueDate, year, month));
+  };
+
   const filtered = useMemo(() => {
     let result = [...state.sales]
-      .filter(s => isInMonth(s.saleDate, currentYear, currentMonth))
+      .filter(s => isInMonth(s.saleDate, currentYear, currentMonth) || hasParcelsInMonth(s, currentYear, currentMonth))
       .sort((a, b) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime());
 
     if (search) {
@@ -85,7 +92,7 @@ export default function SalesScreen() {
     if (filterPayment !== 'all') result = result.filter(s => s.paymentType === filterPayment);
     if (filterStatus !== 'all') result = result.filter(s => s.status === filterStatus);
     return result;
-  }, [state.sales, state.tags, search, filterPayment, filterStatus, currentMonth, currentYear]);
+  }, [state.sales, state.tags, search, filterPayment, filterStatus, currentMonth, currentYear, isInMonth, hasParcelsInMonth]);
 
   const hasFilters = filterPayment !== 'all' || filterStatus !== 'all';
 
