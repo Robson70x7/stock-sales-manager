@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useReducer, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Tag, Product, Client, Sale, Installment } from '@/types';
+import { Tag, Product, Client, Sale, Installment, AppSettings } from '@/types';
 
 // ============================================================
 // Estado global
@@ -10,6 +10,7 @@ interface AppState {
   products: Product[];
   clients: Client[];
   sales: Sale[];
+  settings: AppSettings;
   isLoading: boolean;
 }
 
@@ -18,6 +19,7 @@ const initialState: AppState = {
   products: [],
   clients: [],
   sales: [],
+  settings: { askReturnStockOnDelete: true },
   isLoading: true,
 };
 
@@ -43,7 +45,9 @@ type AppAction =
   | { type: 'ADD_SALE'; payload: Sale }
   | { type: 'UPDATE_SALE'; payload: Sale }
   | { type: 'DELETE_SALE'; payload: string }
-  | { type: 'UPDATE_INSTALLMENT'; payload: { saleId: string; installment: Installment } };
+  | { type: 'UPDATE_INSTALLMENT'; payload: { saleId: string; installment: Installment } }
+  // Settings
+  | { type: 'UPDATE_SETTINGS'; payload: Partial<AppSettings> };
 
 function appReducer(state: AppState, action: AppAction): AppState {
   switch (action.type) {
@@ -95,6 +99,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }),
       };
     }
+    case 'UPDATE_SETTINGS':
+      return { ...state, settings: { ...state.settings, ...action.payload } };
     default:
       return state;
   }
@@ -124,6 +130,8 @@ interface AppContextValue {
   updateSale: (sale: Sale) => Promise<void>;
   deleteSale: (id: string) => Promise<void>;
   updateInstallment: (saleId: string, installment: Installment) => Promise<void>;
+  // Settings
+  updateSettings: (settings: Partial<AppSettings>) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -155,6 +163,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         AsyncStorage.getItem(STORAGE_KEYS.CLIENTS),
         AsyncStorage.getItem(STORAGE_KEYS.SALES),
       ]);
+      const settingsJson = await AsyncStorage.getItem('app_settings');
       dispatch({
         type: 'LOAD_DATA',
         payload: {
@@ -162,6 +171,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           products: productsJson ? JSON.parse(productsJson) : [],
           clients: clientsJson ? JSON.parse(clientsJson) : [],
           sales: salesJson ? JSON.parse(salesJson) : [],
+          settings: settingsJson ? JSON.parse(settingsJson) : { askReturnStockOnDelete: true },
         },
       });
     } catch (error) {
@@ -201,7 +211,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const newProducts = state.products.map(p => p.tagIds.includes(id) ? { ...p, tagIds: p.tagIds.filter(t => t !== id) } : p);
     const newClients = state.clients.map(c => c.tagIds.includes(id) ? { ...c, tagIds: c.tagIds.filter(t => t !== id) } : c);
     const newSales = state.sales.map(s => s.tagIds.includes(id) ? { ...s, tagIds: s.tagIds.filter(t => t !== id) } : s);
-    dispatch({ type: 'LOAD_DATA', payload: { tags: newTags, products: newProducts, clients: newClients, sales: newSales } });
+    dispatch({ type: 'LOAD_DATA', payload: { tags: newTags, products: newProducts, clients: newClients, sales: newSales, settings: state.settings } });
     await Promise.all([
       AsyncStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(newTags)),
       AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(newProducts)),
@@ -315,6 +325,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
   }, [state.sales]);
 
+  const updateSettings = useCallback(async (settings: Partial<AppSettings>) => {
+    dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
+    const newSettings = { ...state.settings, ...settings };
+    await AsyncStorage.setItem('app_settings', JSON.stringify(newSettings));
+  }, [state.settings]);
+
   return (
     <AppContext.Provider value={{
       state,
@@ -324,6 +340,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addProduct, updateProduct, deleteProduct,
       addClient, updateClient, deleteClient,
       addSale, updateSale, deleteSale, updateInstallment,
+      updateSettings,
     }}>
       {children}
     </AppContext.Provider>

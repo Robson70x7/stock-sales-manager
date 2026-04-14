@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -14,10 +14,12 @@ import { Platform } from 'react-native';
 
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, deleteSale, updateInstallment } = useApp();
+  const { state, deleteSale, updateInstallment, updateSettings } = useApp();
   const colors = useColors();
   const router = useRouter();
   const [showDelete, setShowDelete] = useState(false);
+  const [showReturnStock, setShowReturnStock] = useState(false);
+  const [dontAskAgain, setDontAskAgain] = useState(false);
 
   const sale = state.sales.find(s => s.id === id);
   if (!sale) return (
@@ -30,9 +32,20 @@ export default function SaleDetailScreen() {
   const paidAmount = sale.installments.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
   const pendingAmount = sale.totalAmount - paidAmount;
 
-  const handleDelete = async () => {
+  const handleDelete = async (returnStock: boolean = false) => {
+    if (dontAskAgain) {
+      await updateSettings({ askReturnStockOnDelete: false });
+    }
     await deleteSale(sale.id);
     router.back();
+  };
+
+  const handleDeletePress = () => {
+    if (state.settings.askReturnStockOnDelete) {
+      setShowReturnStock(true);
+    } else {
+      setShowDelete(true);
+    }
   };
 
   const toggleInstallment = async (installment: Installment) => {
@@ -154,7 +167,7 @@ export default function SaleDetailScreen() {
             <Text style={styles.editBtnText}>Editar</Text>
           </Pressable>
           <Pressable
-            onPress={() => setShowDelete(true)}
+            onPress={handleDeletePress}
             style={({ pressed }) => [styles.deleteBtn, { borderColor: '#DC2626' }, pressed && { opacity: 0.7 }]}
           >
             <MaterialIcons name="delete" size={18} color="#DC2626" />
@@ -164,12 +177,27 @@ export default function SaleDetailScreen() {
       </View>
 
       <ConfirmDialog
+        visible={showReturnStock}
+        title="Devolver ao Estoque?"
+        message="Deseja devolver os itens desta venda ao estoque?"
+        confirmLabel="Devolver"
+        onConfirm={() => {
+          setShowReturnStock(false);
+          handleDelete(true);
+        }}
+        onCancel={() => {
+          setShowReturnStock(false);
+          setShowDelete(true);
+        }}
+      />
+
+      <ConfirmDialog
         visible={showDelete}
         title="Excluir Venda"
         message={`Deseja excluir esta venda? Esta ação não pode ser desfeita.`}
         confirmLabel="Excluir"
         destructive
-        onConfirm={handleDelete}
+        onConfirm={() => handleDelete(false)}
         onCancel={() => setShowDelete(false)}
       />
     </ScrollView>

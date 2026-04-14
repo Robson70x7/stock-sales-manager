@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, Pressable, StyleSheet } from 'react-native';
+import { View, Text, FlatList, TextInput, Pressable, StyleSheet, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
@@ -37,8 +37,12 @@ export default function ProductsScreen() {
         style={({ pressed }) => [styles.card, { backgroundColor: colors.surface, borderColor: colors.border }, pressed && { opacity: 0.7 }]}
       >
         <View style={styles.cardHeader}>
-          <View style={styles.productIcon}>
-            <MaterialIcons name="inventory" size={20} color={colors.primary} />
+          <View style={[styles.productIcon, { backgroundColor: colors.surface }]}>
+            {item.photoUri ? (
+              <Image source={{ uri: item.photoUri }} style={styles.productPhoto} />
+            ) : (
+              <MaterialIcons name="inventory" size={20} color={colors.primary} />
+            )}
           </View>
           <View style={styles.cardInfo}>
             <Text style={[styles.productName, { color: colors.foreground }]} numberOfLines={1}>{item.name}</Text>
@@ -156,7 +160,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E293B',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
+  productPhoto: { width: 40, height: 40, borderRadius: 10 },
   cardInfo: { flex: 1 },
   productName: { fontSize: 15, fontWeight: '600' },
   category: { fontSize: 12, marginTop: 2 },

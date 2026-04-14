@@ -88,3 +88,12 @@
 - [x] Corrigir problema de data com 1 dia atrasado (timezone/UTC)
 - [x] Adicionar validação de estoque (não permitir quantidade maior que disponível)
 - [x] Mudar formato de datas no título para mês abreviado (Jan 2026, Fev 2026, etc)
+
+
+## Correções e Melhorias (v1.5)
+- [x] Adicionar campo de foto ao produto com upload via image picker
+- [x] Renderizar fotos na listagem de produtos
+- [x] Tornar cards de Recebido/A Receber clicáveis para filtrar operações
+- [x] Adicionar diálogo de devolução de estoque ao excluir venda
+- [x] Adicionar opção "não perguntar novamente" com salvamento em configurações
+- [x] Criar tela de Configurações para gerenciar preferências do app

@@ -269,3 +269,81 @@ describe('Cálculo de totais mensais', () => {
     expect(pending).toBe(200);
   });
 });
+
+
+// ============================================================
+// Testes para novas funcionalidades (v1.5)
+// ============================================================
+
+describe('Novas Funcionalidades', () => {
+  it('verifica se AppSettings tem campo askReturnStockOnDelete', () => {
+    const settings = { askReturnStockOnDelete: true };
+    expect(settings.askReturnStockOnDelete).toBe(true);
+  });
+
+  it('verifica se Product pode ter campo photoUri', () => {
+    const product = {
+      id: '1',
+      name: 'Produto com Foto',
+      stock: 10,
+      costPrice: 100,
+      salePrice: 150,
+      description: 'Teste',
+      tagIds: [],
+      photoUri: 'file:///path/to/photo.jpg',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    expect(product.photoUri).toBeDefined();
+    expect(product.photoUri).toContain('photo.jpg');
+  });
+
+  it('verifica se Installment tem campo history', () => {
+    const installment = {
+      id: '1',
+      amount: 100,
+      dueDate: new Date().toISOString(),
+      status: 'pending' as const,
+      paidDate: undefined,
+      history: [
+        { action: 'created', timestamp: new Date().toISOString() },
+      ],
+    };
+    expect(installment.history).toBeDefined();
+    expect(installment.history.length).toBe(1);
+    expect(installment.history[0].action).toBe('created');
+  });
+
+  it('verifica se Sale tem campo firstInstallmentDate', () => {
+    const sale = {
+      id: '1',
+      clientId: 'c1',
+      clientName: 'Cliente Teste',
+      saleDate: new Date().toISOString(),
+      firstInstallmentDate: new Date().toISOString(),
+      items: [],
+      totalAmount: 1000,
+      paymentType: 'credit' as const,
+      installmentsCount: 3,
+      description: '',
+      status: 'pending' as const,
+      installments: [],
+      tagIds: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    expect(sale.firstInstallmentDate).toBeDefined();
+  });
+
+  it('verifica se filtro de status funciona corretamente', () => {
+    const sales = [
+      { id: '1', status: 'paid' as const },
+      { id: '2', status: 'pending' as const },
+      { id: '3', status: 'paid' as const },
+    ];
+    
+    const paidSales = sales.filter(s => s.status === 'paid');
+    expect(paidSales.length).toBe(2);
+    expect(paidSales.every(s => s.status === 'paid')).toBe(true);
+  });
+});

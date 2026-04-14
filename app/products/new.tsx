@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
+import { useState } from 'react';
+import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
@@ -19,6 +20,7 @@ export default function NewProductScreen() {
   const [stock, setStock] = useState('');
   const [unit, setUnit] = useState('un');
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   const toggleTag = (id: string) => {
@@ -28,6 +30,18 @@ export default function NewProductScreen() {
   const parsePrice = (val: string) => {
     const cleaned = val.replace(/[^0-9,\.]/g, '').replace(',', '.');
     return parseFloat(cleaned) || 0;
+  };
+
+  const pickImage = async () => {
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+    if (!result.canceled) {
+      setPhotoUri(result.assets[0].uri);
+    }
   };
 
   const handleSave = async () => {
@@ -43,6 +57,7 @@ export default function NewProductScreen() {
         salePrice: parsePrice(salePrice),
         stock: parseInt(stock) || 0,
         unit: unit.trim() || 'un',
+        photoUri: photoUri || undefined,
         tagIds: selectedTagIds,
       });
       router.back();
@@ -56,6 +71,20 @@ export default function NewProductScreen() {
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]} keyboardShouldPersistTaps="handled">
       <View style={styles.form}>
+        <View style={styles.section}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Foto do Produto</Text>
+          <Pressable onPress={pickImage} style={[styles.photoPickerBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.photoPreview} />
+            ) : (
+              <>
+                <MaterialIcons name="image" size={40} color={colors.muted} />
+                <Text style={[styles.photoPickerText, { color: colors.muted }]}>Toque para adicionar foto</Text>
+              </>
+            )}
+          </Pressable>
+        </View>
+
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Informações Básicas</Text>
           <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -130,6 +159,9 @@ const styles = StyleSheet.create({
   form: { padding: 16, gap: 20, paddingBottom: 40 },
   section: { gap: 10 },
   sectionTitle: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  photoPickerBtn: { borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', height: 160, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  photoPreview: { width: '100%', height: '100%', borderRadius: 12 },
+  photoPickerText: { fontSize: 14 },
   inputGroup: { borderRadius: 12, borderWidth: 0.5, overflow: 'hidden' },
   inputRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 12, gap: 12 },
   label: { fontSize: 14, width: 120 },

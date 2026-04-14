@@ -30,6 +30,7 @@ export default function HomeScreen() {
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
   const [search, setSearch] = useState('');
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'received' | 'pending'>('all');
 
   const translateX = useRef(new Animated.Value(0)).current;
 
@@ -126,9 +127,15 @@ export default function HomeScreen() {
     return state.tags.filter(t => tagIds.has(t.id));
   }, [summaryItems, state.tags]);
 
-  // Filtrar itens por pesquisa e tag
+  // Filtrar itens por pesquisa, tag e status
   const filteredItems = useMemo(() => {
     let result = summaryItems;
+
+    if (statusFilter === 'received') {
+      result = result.filter(item => item.status === 'paid');
+    } else if (statusFilter === 'pending') {
+      result = result.filter(item => item.status !== 'paid');
+    }
 
     if (activeTagFilter) {
       result = result.filter(item => item.tagIds.includes(activeTagFilter));
@@ -149,7 +156,7 @@ export default function HomeScreen() {
     }
 
     return result;
-  }, [summaryItems, search, activeTagFilter, state.tags]);
+  }, [summaryItems, search, activeTagFilter, statusFilter, state.tags]);
 
   const isCurrentMonth = currentYear === now.getFullYear() && currentMonth === now.getMonth();
 
@@ -237,14 +244,14 @@ export default function HomeScreen() {
             <Text style={[styles.totalLabel, { color: colors.muted }]}>Total do Mês</Text>
             <Text style={[styles.totalValue, { color: colors.foreground }]}>{formatCurrency(monthTotals.total)}</Text>
           </View>
-          <View style={[styles.totalCard, { backgroundColor: '#16A34A10', borderColor: '#16A34A30' }]}>
+          <Pressable onPress={() => setStatusFilter(statusFilter === 'received' ? 'all' : 'received')} style={({ pressed }: any) => [styles.totalCard, { backgroundColor: statusFilter === 'received' ? '#16A34A30' : '#16A34A10', borderColor: '#16A34A30' }, pressed && { opacity: 0.7 }]}>
             <Text style={[styles.totalLabel, { color: '#16A34A' }]}>Recebido</Text>
             <Text style={[styles.totalValue, { color: '#16A34A' }]}>{formatCurrency(monthTotals.received)}</Text>
-          </View>
-          <View style={[styles.totalCard, { backgroundColor: '#D9770610', borderColor: '#D9770630' }]}>
+          </Pressable>
+          <Pressable onPress={() => setStatusFilter(statusFilter === 'pending' ? 'all' : 'pending')} style={({ pressed }: any) => [styles.totalCard, { backgroundColor: statusFilter === 'pending' ? '#D9770630' : '#D9770610', borderColor: '#D9770630' }, pressed && { opacity: 0.7 }]}>
             <Text style={[styles.totalLabel, { color: '#D97706' }]}>A Receber</Text>
             <Text style={[styles.totalValue, { color: '#D97706' }]}>{formatCurrency(monthTotals.pending)}</Text>
-          </View>
+          </Pressable>
           <View style={[styles.totalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.totalLabel, { color: colors.muted }]}>Operações</Text>
             <Text style={[styles.totalValue, { color: colors.foreground }]}>{summaryItems.length}</Text>

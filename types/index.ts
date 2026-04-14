@@ -22,6 +22,7 @@ export interface Product {
   salePrice: number;
   stock: number;
   unit?: string;
+  photoUri?: string; // Base64 ou URI local da foto do produto
   tagIds: string[];
   createdAt: string;
   updatedAt: string;
@@ -141,4 +142,10 @@ export interface ReportData {
     revenue: number;
     received: number;
   }>;
+}
+
+
+// Configurações do app
+export interface AppSettings {
+  askReturnStockOnDelete: boolean; // Perguntar se quer devolver ao estoque ao excluir venda
 }
