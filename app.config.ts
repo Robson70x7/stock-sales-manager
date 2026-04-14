@@ -51,7 +51,10 @@ const config: ExpoConfig = {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
     "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Permitir acesso à galeria de fotos para adicionar imagens de produtos",
+        "NSCameraUsageDescription": "Permitir acesso à câmera para capturar fotos de produtos",
+        "NSPhotoLibraryAddUsageDescription": "Permitir salvar fotos na galeria"
       }
   },
   android: {
@@ -64,7 +67,12 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
-    permissions: ["POST_NOTIFICATIONS"],
+    permissions: [
+      "POST_NOTIFICATIONS",
+      "READ_EXTERNAL_STORAGE",
+      "WRITE_EXTERNAL_STORAGE",
+      "CAMERA"
+    ],
     intentFilters: [
       {
         action: "VIEW",
@@ -86,6 +94,13 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    [
+      "expo-image-picker",
+      {
+        photosPermission: "Permitir acesso a galeria de fotos para adicionar imagens de produtos",
+        cameraPermission: "Permitir acesso a camera para capturar fotos de produtos",
+      },
+    ],
     [
       "expo-audio",
       {

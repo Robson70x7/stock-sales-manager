@@ -108,3 +108,7 @@
 
 ## Bugs Encontrados (v1.6.1) — CORRIGIDO
 - [x] Vendas com parcelas não aparecem em meses diferentes da data de criação (filtro de mês)
+
+
+## Bugs Encontrados (v1.7.1)
+- [x] Foto não carregava no celular (permissões não configuradas)
