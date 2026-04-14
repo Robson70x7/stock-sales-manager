@@ -128,7 +128,7 @@ interface AppContextValue {
   // Sales
   addSale: (sale: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Sale>;
   updateSale: (sale: Sale) => Promise<void>;
-  deleteSale: (id: string) => Promise<void>;
+  deleteSale: (id: string, shouldReturnStock?: boolean) => Promise<void>;
   updateInstallment: (saleId: string, installment: Installment) => Promise<void>;
   // Settings
   updateSettings: (settings: Partial<AppSettings>) => Promise<void>;
@@ -306,11 +306,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
   }, [state.sales]);
 
-  const deleteSale = useCallback(async (id: string) => {
+  const deleteSale = useCallback(async (id: string, shouldReturnStock: boolean = true) => {
+    const saleToDelete = state.sales.find(s => s.id === id);
+    if (!saleToDelete) return;
+    
     dispatch({ type: 'DELETE_SALE', payload: id });
     const newSales = state.sales.filter(s => s.id !== id);
+    
+    // Devolver estoque se configurado
+    let updatedProducts = state.products;
+    if (shouldReturnStock) {
+      updatedProducts = state.products.map(product => {
+        const saleItem = saleToDelete.items.find(item => item.productId === product.id);
+        if (saleItem) {
+          return {
+            ...product,
+            stock: product.stock + saleItem.quantity,
+            updatedAt: new Date().toISOString(),
+          };
+        }
+        return product;
+      });
+      await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
+      updatedProducts.forEach(p => {
+        if (state.products.find(sp => sp.id === p.id)?.stock !== p.stock) {
+          dispatch({ type: 'UPDATE_PRODUCT', payload: p });
+        }
+      });
+    }
+    
     await AsyncStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
-  }, [state.sales]);
+  }, [state.sales, state.products]);
 
   const updateInstallment = useCallback(async (saleId: string, installment: Installment) => {
     dispatch({ type: 'UPDATE_INSTALLMENT', payload: { saleId, installment } });

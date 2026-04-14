@@ -36,7 +36,7 @@ export default function SaleDetailScreen() {
     if (dontAskAgain) {
       await updateSettings({ askReturnStockOnDelete: false });
     }
-    await deleteSale(sale.id);
+    await deleteSale(sale.id, returnStock);
     router.back();
   };
 
@@ -188,6 +188,11 @@ export default function SaleDetailScreen() {
         onCancel={() => {
           setShowReturnStock(false);
           setShowDelete(true);
+        }}
+        checkbox={{
+          label: "Não perguntar novamente",
+          checked: dontAskAgain,
+          onCheckedChange: setDontAskAgain,
         }}
       />
 

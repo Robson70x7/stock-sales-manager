@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Image } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -6,6 +6,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
+import { persistImage } from '@/lib/imageUtils';
 
 export default function NewProductScreen() {
   const { state, addProduct } = useApp();
@@ -49,6 +50,14 @@ export default function NewProductScreen() {
     if (!salePrice.trim()) { Alert.alert('Atenção', 'Informe o preço de venda.'); return; }
     setSaving(true);
     try {
+      const productId = Date.now().toString(36);
+      let persistedPhotoUri: string | undefined;
+      
+      // Persistir imagem se houver
+      if (photoUri) {
+        persistedPhotoUri = await persistImage(photoUri, productId);
+      }
+      
       await addProduct({
         name: name.trim(),
         category: category.trim() || undefined,
@@ -57,7 +66,7 @@ export default function NewProductScreen() {
         salePrice: parsePrice(salePrice),
         stock: parseInt(stock) || 0,
         unit: unit.trim() || 'un',
-        photoUri: photoUri || undefined,
+        photoUri: persistedPhotoUri || undefined,
         tagIds: selectedTagIds,
       });
       router.back();

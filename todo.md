@@ -97,3 +97,10 @@
 - [x] Adicionar diálogo de devolução de estoque ao excluir venda
 - [x] Adicionar opção "não perguntar novamente" com salvamento em configurações
 - [x] Criar tela de Configurações para gerenciar preferências do app
+
+
+## Bugs Encontrados (v1.5.1) — CORRIGIDOS
+- [x] Tela de edição de produto não tem opção de alterar imagem
+- [x] Modal de novo cliente fecha ao focar em input
+- [x] Imagem de produto perdida ao recarregar página (persistência)
+- [x] Devolução de estoque não adiciona quantidade corretamente ao excluir venda

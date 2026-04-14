@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback } from 'react';
-import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Modal, FlatList } from 'react-native';
+import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Modal, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -345,35 +345,40 @@ export default function NewSaleScreen() {
 
       {/* Modal de novo cliente */}
       <Modal visible={showNewClient} transparent animationType="slide" onRequestClose={() => setShowNewClient(false)}>
-        <Pressable style={styles.overlay} onPress={() => setShowNewClient(false)}>
-          <View style={[styles.pickerSheet, { backgroundColor: colors.surface }]}>
-            <View style={styles.sheetHandle} />
-            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Novo Cliente</Text>
-            <TextInput
-              style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 12 }]}
-              placeholder="Nome do cliente"
-              placeholderTextColor={colors.muted}
-              value={newClientName}
-              onChangeText={setNewClientName}
-              returnKeyType="done"
-            />
-            <Pressable
-              onPress={async () => {
-                if (!newClientName.trim()) {
-                  Alert.alert('Atencao', 'Informe o nome do cliente.');
-                  return;
-                }
-                const newClient = await addClient({ name: newClientName.trim(), tagIds: [] });
-                setSelectedClientId(newClient.id);
-                setNewClientName('');
-                setShowNewClient(false);
-              }}
-              style={[styles.saveBtn, { backgroundColor: colors.primary }]}
-            >
-              <Text style={styles.saveBtnText}>Criar Cliente</Text>
-            </Pressable>
-          </View>
-        </Pressable>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={styles.overlay} onPress={() => setShowNewClient(false)}>
+            <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ flexGrow: 1, justifyContent: 'flex-end' }}>
+              <View style={[styles.pickerSheet, { backgroundColor: colors.surface }]}>
+                <View style={styles.sheetHandle} />
+                <Text style={[styles.sectionTitle, { color: colors.foreground, marginBottom: 16 }]}>Novo Cliente</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border, borderWidth: 1, borderRadius: 8, padding: 12, marginBottom: 12 }]}
+                  placeholder="Nome do cliente"
+                  placeholderTextColor={colors.muted}
+                  value={newClientName}
+                  onChangeText={setNewClientName}
+                  returnKeyType="done"
+                  autoFocus
+                />
+                <Pressable
+                  onPress={async () => {
+                    if (!newClientName.trim()) {
+                      Alert.alert('Atencao', 'Informe o nome do cliente.');
+                      return;
+                    }
+                    const newClient = await addClient({ name: newClientName.trim(), tagIds: [] });
+                    setSelectedClientId(newClient.id);
+                    setNewClientName('');
+                    setShowNewClient(false);
+                  }}
+                  style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+                >
+                  <Text style={styles.saveBtnText}>Criar Cliente</Text>
+                </Pressable>
+              </View>
+            </ScrollView>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
     </ScrollView>
   );
