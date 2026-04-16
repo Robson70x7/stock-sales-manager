@@ -112,3 +112,21 @@
 
 ## Bugs Encontrados (v1.7.1)
 - [x] Foto não carregava no celular (permissões não configuradas)
+
+
+## Versão Desktop (v2.0) — CONCLUÍDA
+- [x] Reestruturar projeto para código compartilhado (shared/)
+- [x] Criar projeto Electron desktop
+- [x] Implementar sincronização P2P local com arquitetura extensível
+- [x] Criar UI de sincronização (mobile + desktop)
+- [x] Configurar scripts de build separados (mobile e desktop)
+- [x] Compilar versão desktop
+- [x] Gerar arquivo portável para Windows
+
+## Próximos Passos (v2.1+)
+- [ ] Testar sincronização P2P em rede real
+- [ ] Implementar adaptador Backend (futuro)
+- [ ] Implementar adaptador Híbrido (futuro)
+- [ ] Adicionar ícone customizado para desktop
+- [ ] Gerar instalador NSIS no Windows
+- [ ] Exportar/compartilhar relatório (futuro)
