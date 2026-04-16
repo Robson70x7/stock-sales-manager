@@ -35,12 +35,21 @@ if exist "." (
     pause
     exit /b 1
 )
-
 REM Build Desktop (Electron)
 echo.
 echo %YELLOW%[2/2] Compilando versão Desktop (Electron)...%RESET%
+
+REM Procurar pasta desktop em locais comuns
+set "DESKTOP_PATH="
 if exist "..\stock-sales-manager-desktop" (
-    cd ..\stock-sales-manager-desktop
+    set "DESKTOP_PATH=..\stock-sales-manager-desktop"
+) else if exist ".\stock-sales-manager-desktop" (
+    set "DESKTOP_PATH=.\stock-sales-manager-desktop"
+) else if exist "..\..\..\stock-sales-manager-desktop" (
+    set "DESKTOP_PATH=..\..\..\stock-sales-manager-desktop"
+)
+if not "%DESKTOP_PATH%"=="" (
+    cd %DESKTOP_PATH%
     
     echo Instalando dependências...
     call npm install --legacy-peer-deps
@@ -75,7 +84,10 @@ if exist "..\stock-sales-manager-desktop" (
     cd ..\stock-sales-manager
     echo %GREEN%✓ Desktop build concluído%RESET%
 ) else (
-    echo %RED%✗ Erro: Diretório desktop não encontrado%RESET%
+    echo %RED%✗ Erro: Diretório desktop não encontrado em:%RESET%
+    echo   - ..\stock-sales-manager-desktop
+    echo   - .\stock-sales-manager-desktop
+    echo   - ..\..\..\stock-sales-manager-desktop
     pause
     exit /b 1
 )
