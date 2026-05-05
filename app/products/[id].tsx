@@ -22,7 +22,6 @@ export default function ProductDetailScreen() {
     </View>
   );
 
-  const tags = state.tags.filter(t => product.tagIds.includes(t.id));
   const stockColor = product.stock <= 0 ? '#DC2626' : product.stock <= 5 ? '#D97706' : '#16A34A';
   const margin = product.costPrice > 0 ? ((product.salePrice - product.costPrice) / product.costPrice * 100).toFixed(1) : null;
 
@@ -41,11 +40,6 @@ export default function ProductDetailScreen() {
           <Text style={[styles.productName, { color: colors.foreground }]}>{product.name}</Text>
           {product.category && <Text style={[styles.category, { color: colors.muted }]}>{product.category}</Text>}
           {product.description && <Text style={[styles.description, { color: colors.muted }]}>{product.description}</Text>}
-          {tags.length > 0 && (
-            <View style={styles.tagsRow}>
-              {tags.map(tag => <TagChip key={tag.id} tag={tag} small />)}
-            </View>
-          )}
         </View>
 
         <View style={styles.statsGrid}>
@@ -59,7 +53,9 @@ export default function ProductDetailScreen() {
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.statLabel, { color: colors.muted }]}>Estoque</Text>
-            <Text style={[styles.statValue, { color: stockColor }]}>{product.stock} {product.unit || 'un'}</Text>
+            <View style={styles.stockRow}>
+              <Text style={[styles.statValue, { color: stockColor }]}>{product.stock} {product.unit || 'un'}</Text>
+            </View>
           </View>
           {margin && (
             <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -109,12 +105,16 @@ const styles = StyleSheet.create({
   iconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   productName: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
   category: { fontSize: 14 },
+  sku: { fontSize: 12, fontFamily: 'monospace' },
+  supplier: { fontSize: 12 },
   description: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 4 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   statCard: { flex: 1, minWidth: '45%', borderRadius: 12, padding: 14, borderWidth: 0.5, gap: 4 },
   statLabel: { fontSize: 12 },
   statValue: { fontSize: 18, fontWeight: '700' },
+  stockRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  minStockText: { fontSize: 10 },
   dateText: { fontSize: 12, textAlign: 'center' },
   actions: { flexDirection: 'row', gap: 12 },
   editBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12 },

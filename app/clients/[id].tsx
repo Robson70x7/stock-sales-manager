@@ -23,7 +23,6 @@ export default function ClientDetailScreen() {
     </View>
   );
 
-  const tags = state.tags.filter(t => client.tagIds.includes(t.id));
   const clientSales = state.sales.filter(s => s.clientId === id);
   const totalSpent = clientSales.filter(s => s.status !== 'cancelled').reduce((sum, s) => sum + s.totalAmount, 0);
   const initials = getInitials(client.name);
@@ -43,11 +42,6 @@ export default function ClientDetailScreen() {
           </View>
           <Text style={[styles.clientName, { color: colors.foreground }]}>{client.name}</Text>
           {client.document && <Text style={[styles.document, { color: colors.muted }]}>{client.document}</Text>}
-          {tags.length > 0 && (
-            <View style={styles.tagsRow}>
-              {tags.map(tag => <TagChip key={tag.id} tag={tag} small />)}
-            </View>
-          )}
         </View>
 
         {/* Contato */}

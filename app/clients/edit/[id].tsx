@@ -19,14 +19,9 @@ export default function EditClientScreen() {
   const [email, setEmail] = useState(client?.email || '');
   const [address, setAddress] = useState(client?.address || '');
   const [notes, setNotes] = useState(client?.notes || '');
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(client?.tagIds || []);
   const [saving, setSaving] = useState(false);
 
   if (!client) return null;
-
-  const toggleTag = (tagId: string) => {
-    setSelectedTagIds(prev => prev.includes(tagId) ? prev.filter(t => t !== tagId) : [...prev, tagId]);
-  };
 
   const handleSave = async () => {
     if (!name.trim()) { Alert.alert('Atenção', 'Informe o nome do cliente.'); return; }
@@ -40,7 +35,6 @@ export default function EditClientScreen() {
         email: email.trim() || undefined,
         address: address.trim() || undefined,
         notes: notes.trim() || undefined,
-        tagIds: selectedTagIds,
       });
       router.back();
     } catch (e) {
@@ -102,17 +96,6 @@ export default function EditClientScreen() {
             />
           </View>
         </View>
-
-        {state.tags.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tags</Text>
-            <View style={styles.tagsWrap}>
-              {state.tags.map(tag => (
-                <TagChip key={tag.id} tag={tag} selected={selectedTagIds.includes(tag.id)} onPress={() => toggleTag(tag.id)} />
-              ))}
-            </View>
-          </View>
-        )}
 
         <Pressable
           onPress={handleSave}

@@ -24,9 +24,11 @@ export default function NewClientScreen() {
     setSelectedTagIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
   };
 
-  const handleSave = async () => {
-    if (!name.trim()) { Alert.alert('Atenção', 'Informe o nome do cliente.'); return; }
-    setSaving(true);
+const handleSave = async () => {
+    if (!name.trim()) {
+      Alert.alert('Erro', 'Nome é obrigatório');
+      return;
+    }
     try {
       await addClient({
         name: name.trim(),
@@ -35,13 +37,10 @@ export default function NewClientScreen() {
         email: email.trim() || undefined,
         address: address.trim() || undefined,
         notes: notes.trim() || undefined,
-        tagIds: selectedTagIds,
       });
       router.back();
-    } catch (e) {
-      Alert.alert('Erro', 'Não foi possível salvar o cliente.');
-    } finally {
-      setSaving(false);
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível criar o cliente');
     }
   };
 

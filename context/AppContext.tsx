@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useReducer, useCallback } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Tag, Product, Client, Sale, Installment, AppSettings } from '@/types';
+import { Tag, Product, Client, Sale, SaleItem, Installment, AppSettings } from '@/types';
+import * as db from '@/lib/database/db';
 
 // ============================================================
 // Estado global
@@ -99,6 +99,7 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }),
       };
     }
+    // Settings
     case 'UPDATE_SETTINGS':
       return { ...state, settings: { ...state.settings, ...action.payload } };
     default:
@@ -109,10 +110,8 @@ function appReducer(state: AppState, action: AppAction): AppState {
 // ============================================================
 // Context
 // ============================================================
-interface AppContextValue {
+interface AppContextType extends AppState {
   state: AppState;
-  dispatch: React.Dispatch<AppAction>;
-  saveData: (newState: Partial<Omit<AppState, 'isLoading'>>) => Promise<void>;
   // Tags
   addTag: (tag: Omit<Tag, 'id' | 'createdAt'>) => Promise<Tag>;
   updateTag: (tag: Tag) => Promise<void>;
@@ -128,50 +127,223 @@ interface AppContextValue {
   // Sales
   addSale: (sale: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Sale>;
   updateSale: (sale: Sale) => Promise<void>;
-  deleteSale: (id: string, shouldReturnStock?: boolean) => Promise<void>;
+  deleteSale: (id: string, returnStock?: boolean) => Promise<void>;
   updateInstallment: (saleId: string, installment: Installment) => Promise<void>;
   // Settings
   updateSettings: (settings: Partial<AppSettings>) => Promise<void>;
 }
 
-const AppContext = createContext<AppContextValue | null>(null);
-
-const STORAGE_KEYS = {
-  TAGS: '@vendafacil:tags',
-  PRODUCTS: '@vendafacil:products',
-  CLIENTS: '@vendafacil:clients',
-  SALES: '@vendafacil:sales',
-};
+const AppContext = createContext<AppContextType | null>(null);
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 }
 
+function toDbTag(tag: Tag): db.DbTag {
+  return {
+    id: tag.id,
+    name: tag.name,
+    color: tag.color,
+    createdAt: new Date(tag.createdAt).getTime(),
+  };
+}
+
+function fromDbTag(row: db.DbTag): Tag {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color,
+    createdAt: new Date(row.createdAt).toISOString(),
+  };
+}
+
+function toDbProduct(product: Product): db.DbProduct {
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description || null,
+    category: product.category || null,
+    costPrice: product.costPrice,
+    salePrice: product.salePrice,
+    stock: product.stock,
+    unit: product.unit || null,
+    photoUri: product.photoUri || null,
+    createdAt: new Date(product.createdAt).getTime(),
+    updatedAt: new Date(product.updatedAt).getTime(),
+  };
+}
+
+function fromDbProduct(row: db.DbProduct): Product {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description || undefined,
+    category: row.category || undefined,
+    costPrice: row.costPrice,
+    salePrice: row.salePrice,
+    stock: row.stock,
+    unit: row.unit || undefined,
+    photoUri: row.photoUri || undefined,
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
+  };
+}
+
+function toDbClient(client: Client): db.DbClient {
+  return {
+    id: client.id,
+    name: client.name,
+    document: client.document || null,
+    phone: client.phone || null,
+    email: client.email || null,
+    address: client.address || null,
+    notes: client.notes || null,
+    createdAt: new Date(client.createdAt).getTime(),
+    updatedAt: new Date(client.updatedAt).getTime(),
+  };
+}
+
+function fromDbClient(row: db.DbClient): Client {
+  return {
+    id: row.id,
+    name: row.name,
+    document: row.document || undefined,
+    phone: row.phone || undefined,
+    email: row.email || undefined,
+    address: row.address || undefined,
+    notes: row.notes || undefined,
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
+  };
+}
+
+function toDbSale(sale: Sale): db.DbSale {
+  return {
+    id: sale.id,
+    description: sale.description || null,
+    clientId: sale.clientId || null,
+    clientName: sale.clientName || null,
+    paymentType: sale.paymentType,
+    installmentsCount: sale.installmentsCount,
+    subtotal: sale.subtotal,
+    discountType: sale.discountType || null,
+    discountValue: sale.discountValue,
+    totalAmount: sale.totalAmount,
+    status: sale.status,
+    saleDate: new Date(sale.saleDate).getTime(),
+    firstInstallmentDate: sale.firstInstallmentDate ? new Date(sale.firstInstallmentDate).getTime() : null,
+    tagIds: JSON.stringify(sale.tagIds),
+    createdAt: new Date(sale.createdAt).getTime(),
+    updatedAt: new Date(sale.updatedAt).getTime(),
+  };
+}
+
+function fromDbSale(row: db.DbSale, items: db.DbSaleItem[], installments: db.DbInstallment[]): Sale {
+  return {
+    id: row.id,
+    description: row.description || undefined,
+    clientId: row.clientId || undefined,
+    clientName: row.clientName || undefined,
+    items: items.map(i => ({
+      productId: i.productId,
+      productName: i.productName,
+      quantity: i.quantity,
+      unitPrice: i.unitPrice,
+      totalPrice: i.totalPrice,
+    })),
+    subtotal: row.subtotal,
+    discountType: row.discountType as Sale['discountType'] || null,
+    discountValue: row.discountValue,
+    totalAmount: row.totalAmount,
+    paymentType: row.paymentType as Sale['paymentType'],
+    status: row.status as Sale['status'],
+    installmentsCount: row.installmentsCount,
+    installments: installments.map(inst => ({
+      id: inst.id,
+      saleId: inst.saleId,
+      number: inst.number,
+      totalInstallments: inst.totalInstallments,
+      amount: inst.amount,
+      dueDate: new Date(inst.dueDate).toISOString(),
+      paidDate: inst.paidDate ? new Date(inst.paidDate).toISOString() : undefined,
+      status: inst.status as Installment['status'],
+      history: JSON.parse(inst.history || '[]'),
+    })),
+    tagIds: JSON.parse(row.tagIds || '[]'),
+    saleDate: new Date(row.saleDate).toISOString(),
+    firstInstallmentDate: row.firstInstallmentDate ? new Date(row.firstInstallmentDate).toISOString() : undefined,
+    createdAt: new Date(row.createdAt).toISOString(),
+    updatedAt: new Date(row.updatedAt).toISOString(),
+  };
+}
+
+function toDbSaleItem(item: SaleItem, saleId: string): db.DbSaleItem {
+  return {
+    id: item.productId,
+    saleId,
+    productId: item.productId,
+    productName: item.productName,
+    quantity: item.quantity,
+    unitPrice: item.unitPrice,
+    totalPrice: item.totalPrice,
+  };
+}
+
+function toDbInstallment(inst: Installment): db.DbInstallment {
+  return {
+    id: inst.id,
+    saleId: inst.saleId,
+    number: inst.number,
+    totalInstallments: inst.totalInstallments,
+    amount: inst.amount,
+    dueDate: new Date(inst.dueDate).getTime(),
+    paidDate: inst.paidDate ? new Date(inst.paidDate).getTime() : null,
+    status: inst.status,
+    history: JSON.stringify(inst.history),
+  };
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(appReducer, initialState);
 
-  // Carregar dados do AsyncStorage na inicialização
+  // Carregar dados do banco ao iniciar
   useEffect(() => {
     loadAllData();
   }, []);
 
   const loadAllData = async () => {
     try {
-      const [tagsJson, productsJson, clientsJson, salesJson] = await Promise.all([
-        AsyncStorage.getItem(STORAGE_KEYS.TAGS),
-        AsyncStorage.getItem(STORAGE_KEYS.PRODUCTS),
-        AsyncStorage.getItem(STORAGE_KEYS.CLIENTS),
-        AsyncStorage.getItem(STORAGE_KEYS.SALES),
+      // Inicializar banco (criar tabelas se não existirem)
+      await db.getDb();
+
+      // Carregar dados do banco
+      const [dbTags, dbProducts, dbClients, dbSales, dbSettings] = await Promise.all([
+        db.getTags(),
+        db.getProducts(),
+        db.getClients(),
+        db.getSales(),
+        db.getAllSettings(),
       ]);
-      const settingsJson = await AsyncStorage.getItem('app_settings');
+
+      // Transformar e carregar vendas com items e parcelas
+      const sales: Sale[] = await Promise.all(
+        dbSales.map(async (saleRow) => {
+          const items = await db.getSaleItems(saleRow.id);
+          const installments = await db.getInstallments(saleRow.id);
+          return fromDbSale(saleRow, items, installments);
+        })
+      );
+
       dispatch({
         type: 'LOAD_DATA',
         payload: {
-          tags: tagsJson ? JSON.parse(tagsJson) : [],
-          products: productsJson ? JSON.parse(productsJson) : [],
-          clients: clientsJson ? JSON.parse(clientsJson) : [],
-          sales: salesJson ? JSON.parse(salesJson) : [],
-          settings: settingsJson ? JSON.parse(settingsJson) : { askReturnStockOnDelete: true },
+          tags: dbTags.map(fromDbTag),
+          products: dbProducts.map(fromDbProduct),
+          clients: dbClients.map(fromDbClient),
+          sales,
+          settings: dbSettings['app_settings'] 
+            ? JSON.parse(dbSettings['app_settings']) 
+            : { askReturnStockOnDelete: true },
         },
       });
     } catch (error) {
@@ -180,201 +352,157 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const saveData = useCallback(async (newState: Partial<Omit<AppState, 'isLoading'>>) => {
-    const saves: Promise<void>[] = [];
-    if (newState.tags !== undefined) saves.push(AsyncStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(newState.tags)));
-    if (newState.products !== undefined) saves.push(AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(newState.products)));
-    if (newState.clients !== undefined) saves.push(AsyncStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(newState.clients)));
-    if (newState.sales !== undefined) saves.push(AsyncStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newState.sales)));
-    await Promise.all(saves);
-  }, []);
-
   // ---- Tags ----
   const addTag = useCallback(async (tagData: Omit<Tag, 'id' | 'createdAt'>): Promise<Tag> => {
-    const tag: Tag = { ...tagData, id: generateId(), createdAt: new Date().toISOString() };
+    const now = new Date().toISOString();
+    const tag: Tag = { ...tagData, id: generateId(), createdAt: now };
+
     dispatch({ type: 'ADD_TAG', payload: tag });
-    const newTags = [...state.tags, tag];
-    await AsyncStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(newTags));
+    await db.saveTag(toDbTag(tag));
     return tag;
-  }, [state.tags]);
+  }, []);
 
   const updateTag = useCallback(async (tag: Tag) => {
     dispatch({ type: 'UPDATE_TAG', payload: tag });
-    const newTags = state.tags.map(t => t.id === tag.id ? tag : t);
-    await AsyncStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(newTags));
-  }, [state.tags]);
+    await db.saveTag(toDbTag(tag));
+  }, []);
 
   const deleteTag = useCallback(async (id: string) => {
-    // Remove a tag e limpa referências em produtos, clientes e vendas
     dispatch({ type: 'DELETE_TAG', payload: id });
-    const newTags = state.tags.filter(t => t.id !== id);
-    const newProducts = state.products.map(p => p.tagIds.includes(id) ? { ...p, tagIds: p.tagIds.filter(t => t !== id) } : p);
-    const newClients = state.clients.map(c => c.tagIds.includes(id) ? { ...c, tagIds: c.tagIds.filter(t => t !== id) } : c);
-    const newSales = state.sales.map(s => s.tagIds.includes(id) ? { ...s, tagIds: s.tagIds.filter(t => t !== id) } : s);
-    dispatch({ type: 'LOAD_DATA', payload: { tags: newTags, products: newProducts, clients: newClients, sales: newSales, settings: state.settings } });
-    await Promise.all([
-      AsyncStorage.setItem(STORAGE_KEYS.TAGS, JSON.stringify(newTags)),
-      AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(newProducts)),
-      AsyncStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(newClients)),
-      AsyncStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales)),
-    ]);
-  }, [state.tags, state.products, state.clients, state.sales]);
+    await db.deleteTag(id);
+  }, []);
 
   // ---- Products ----
   const addProduct = useCallback(async (productData: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> => {
     const now = new Date().toISOString();
     const product: Product = { ...productData, id: generateId(), createdAt: now, updatedAt: now };
+
     dispatch({ type: 'ADD_PRODUCT', payload: product });
-    const newProducts = [...state.products, product];
-    await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(newProducts));
+    await db.saveProduct(toDbProduct(product));
     return product;
-  }, [state.products]);
+  }, []);
 
   const updateProduct = useCallback(async (product: Product) => {
     const updated = { ...product, updatedAt: new Date().toISOString() };
     dispatch({ type: 'UPDATE_PRODUCT', payload: updated });
-    const newProducts = state.products.map(p => p.id === product.id ? updated : p);
-    await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(newProducts));
-  }, [state.products]);
+    await db.saveProduct(toDbProduct(updated));
+  }, []);
 
   const deleteProduct = useCallback(async (id: string) => {
     dispatch({ type: 'DELETE_PRODUCT', payload: id });
-    const newProducts = state.products.filter(p => p.id !== id);
-    await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(newProducts));
-  }, [state.products]);
+    await db.deleteProduct(id);
+  }, []);
 
   // ---- Clients ----
   const addClient = useCallback(async (clientData: Omit<Client, 'id' | 'createdAt' | 'updatedAt'>): Promise<Client> => {
     const now = new Date().toISOString();
     const client: Client = { ...clientData, id: generateId(), createdAt: now, updatedAt: now };
+
     dispatch({ type: 'ADD_CLIENT', payload: client });
-    const newClients = [...state.clients, client];
-    await AsyncStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(newClients));
+    await db.saveClient(toDbClient(client));
     return client;
-  }, [state.clients]);
+  }, []);
 
   const updateClient = useCallback(async (client: Client) => {
     const updated = { ...client, updatedAt: new Date().toISOString() };
     dispatch({ type: 'UPDATE_CLIENT', payload: updated });
-    const newClients = state.clients.map(c => c.id === client.id ? updated : c);
-    await AsyncStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(newClients));
-  }, [state.clients]);
+    await db.saveClient(toDbClient(updated));
+  }, []);
 
   const deleteClient = useCallback(async (id: string) => {
     dispatch({ type: 'DELETE_CLIENT', payload: id });
-    const newClients = state.clients.filter(c => c.id !== id);
-    await AsyncStorage.setItem(STORAGE_KEYS.CLIENTS, JSON.stringify(newClients));
-  }, [state.clients]);
+    await db.deleteClient(id);
+  }, []);
 
   // ---- Sales ----
-  const addSale = useCallback(async (saleData: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>): Promise<Sale> => {
+  const addSale = useCallback(async (
+    saleData: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'items' | 'installments'>
+  ): Promise<Sale> => {
     const now = new Date().toISOString();
-    const sale: Sale = { ...saleData, id: generateId(), createdAt: now, updatedAt: now };
-    
-    // Debito automatico de estoque
-    const updatedProducts = state.products.map(product => {
-      const saleItem = sale.items.find(item => item.productId === product.id);
-      if (saleItem) {
-        return {
-          ...product,
-          stock: Math.max(0, product.stock - saleItem.quantity),
-          updatedAt: now,
-        };
-      }
-      return product;
-    });
-    
+    const id = generateId();
+    const sale: Sale = {
+      ...saleData,
+      id,
+      items: [],
+      installments: [],
+      createdAt: now,
+      updatedAt: now,
+    };
+
     dispatch({ type: 'ADD_SALE', payload: sale });
-    const newSales = [...state.sales, sale];
-    await AsyncStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
-    
-    // Salvar produtos com estoque atualizado
-    updatedProducts.forEach(p => {
-      if (state.products.find(sp => sp.id === p.id)?.stock !== p.stock) {
-        dispatch({ type: 'UPDATE_PRODUCT', payload: p });
-      }
-    });
-    await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
-    
+    await db.saveSale(toDbSale(sale));
     return sale;
-  }, [state.sales, state.products]);
+  }, []);
 
   const updateSale = useCallback(async (sale: Sale) => {
     const updated = { ...sale, updatedAt: new Date().toISOString() };
     dispatch({ type: 'UPDATE_SALE', payload: updated });
-    const newSales = state.sales.map(s => s.id === sale.id ? updated : s);
-    await AsyncStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
-  }, [state.sales]);
+    await db.saveSale(toDbSale(updated));
 
-  const deleteSale = useCallback(async (id: string, shouldReturnStock: boolean = true) => {
-    const saleToDelete = state.sales.find(s => s.id === id);
-    if (!saleToDelete) return;
-    
-    dispatch({ type: 'DELETE_SALE', payload: id });
-    const newSales = state.sales.filter(s => s.id !== id);
-    
-    // Devolver estoque se configurado
-    let updatedProducts = state.products;
-    if (shouldReturnStock) {
-      updatedProducts = state.products.map(product => {
-        const saleItem = saleToDelete.items.find(item => item.productId === product.id);
-        if (saleItem) {
-          return {
-            ...product,
-            stock: product.stock + saleItem.quantity,
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return product;
-      });
-      await AsyncStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(updatedProducts));
-      updatedProducts.forEach(p => {
-        if (state.products.find(sp => sp.id === p.id)?.stock !== p.stock) {
-          dispatch({ type: 'UPDATE_PRODUCT', payload: p });
-        }
-      });
+    // Atualizar items e parcelas
+    await db.deleteSaleItems(sale.id);
+    for (const item of sale.items) {
+      await db.saveSaleItem(toDbSaleItem(item, sale.id));
     }
-    
-    await AsyncStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
-  }, [state.sales, state.products]);
+    await db.deleteInstallments(sale.id);
+    for (const inst of sale.installments) {
+      await db.saveInstallment(toDbInstallment(inst));
+    }
+  }, []);
+
+  const deleteSale = useCallback(async (id: string, returnStock: boolean = true) => {
+    // Se returnStock, devolver estoque dos produtos
+    if (returnStock) {
+      const items = await db.getSaleItems(id);
+      for (const item of items) {
+        await db.updateProductStock(item.productId, item.quantity);
+      }
+    }
+
+    await db.deleteSaleItems(id);
+    await db.deleteInstallments(id);
+    await db.deleteSale(id);
+    dispatch({ type: 'DELETE_SALE', payload: id });
+  }, []);
 
   const updateInstallment = useCallback(async (saleId: string, installment: Installment) => {
     dispatch({ type: 'UPDATE_INSTALLMENT', payload: { saleId, installment } });
-    const sale = state.sales.find(s => s.id === saleId);
-    if (!sale) return;
-    const updatedInstallments = sale.installments.map(i => i.id === installment.id ? installment : i);
-    const allPaid = updatedInstallments.every(i => i.status === 'paid');
-    const somePaid = updatedInstallments.some(i => i.status === 'paid');
-    const newStatus = allPaid ? 'paid' : somePaid ? 'partial' : 'pending';
-    const updatedSale = { ...sale, installments: updatedInstallments, status: newStatus as any, updatedAt: new Date().toISOString() };
-    const newSales = state.sales.map(s => s.id === saleId ? updatedSale : s);
-    await AsyncStorage.setItem(STORAGE_KEYS.SALES, JSON.stringify(newSales));
-  }, [state.sales]);
+    await db.saveInstallment(toDbInstallment(installment));
+  }, []);
 
-  const updateSettings = useCallback(async (settings: Partial<AppSettings>) => {
-    dispatch({ type: 'UPDATE_SETTINGS', payload: settings });
-    const newSettings = { ...state.settings, ...settings };
-    await AsyncStorage.setItem('app_settings', JSON.stringify(newSettings));
+  // ---- Settings ----
+  const updateSettings = useCallback(async (newSettings: Partial<AppSettings>) => {
+    const updated = { ...state.settings, ...newSettings };
+    dispatch({ type: 'UPDATE_SETTINGS', payload: newSettings });
+    await db.saveSetting('app_settings', JSON.stringify(updated));
   }, [state.settings]);
 
-  return (
-    <AppContext.Provider value={{
-      state,
-      dispatch,
-      saveData,
-      addTag, updateTag, deleteTag,
-      addProduct, updateProduct, deleteProduct,
-      addClient, updateClient, deleteClient,
-      addSale, updateSale, deleteSale, updateInstallment,
-      updateSettings,
-    }}>
-      {children}
-    </AppContext.Provider>
-  );
+  const value: AppContextType = {
+    ...state,
+    state,
+    addTag,
+    updateTag,
+    deleteTag,
+    addProduct,
+    updateProduct,
+    deleteProduct,
+    addClient,
+    updateClient,
+    deleteClient,
+    addSale,
+    updateSale,
+    deleteSale,
+    updateInstallment,
+    updateSettings,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
 export function useApp() {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used within AppProvider');
-  return ctx;
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useApp must be used within an AppProvider');
+  }
+  return context;
 }

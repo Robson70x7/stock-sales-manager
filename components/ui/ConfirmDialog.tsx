@@ -1,6 +1,12 @@
 import React from 'react';
-import { View, Text, Modal, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Modal, Pressable, StyleSheet, Switch } from 'react-native';
 import { useColors } from '@/hooks/use-colors';
+
+interface CheckboxOption {
+  label: string;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+}
 
 interface ConfirmDialogProps {
   visible: boolean;
@@ -11,6 +17,7 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   onCancel: () => void;
   destructive?: boolean;
+  checkbox?: CheckboxOption;
 }
 
 export function ConfirmDialog({
@@ -22,6 +29,7 @@ export function ConfirmDialog({
   onConfirm,
   onCancel,
   destructive = false,
+  checkbox,
 }: ConfirmDialogProps) {
   const colors = useColors();
 
@@ -31,6 +39,17 @@ export function ConfirmDialog({
         <View style={[styles.dialog, { backgroundColor: colors.surface }]}>
           <Text style={[styles.title, { color: colors.foreground }]}>{title}</Text>
           <Text style={[styles.message, { color: colors.muted }]}>{message}</Text>
+          {checkbox && (
+            <View style={styles.checkbox}>
+              <Text style={[styles.checkboxLabel, { color: colors.foreground }]}>{checkbox.label}</Text>
+              <Switch
+                value={checkbox.checked}
+                onValueChange={checkbox.onCheckedChange}
+                trackColor={{ false: colors.border, true: colors.primary }}
+                thumbColor="#fff"
+              />
+            </View>
+          )}
           <View style={styles.buttons}>
             <Pressable
               onPress={onCancel}
@@ -80,6 +99,8 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: 18, fontWeight: '700', marginBottom: 8 },
   message: { fontSize: 14, lineHeight: 20, marginBottom: 20 },
+  checkbox: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, paddingHorizontal: 4 },
+  checkboxLabel: { fontSize: 14 },
   buttons: { flexDirection: 'row', gap: 12 },
   btn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: 'center' },
   cancelText: { fontSize: 14, fontWeight: '600' },

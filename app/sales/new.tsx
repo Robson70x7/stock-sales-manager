@@ -25,6 +25,8 @@ export default function NewSaleScreen() {
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [items, setItems] = useState<SaleItem[]>([]);
   const [manualAmount, setManualAmount] = useState('');
+  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
+  const [discountValue, setDiscountValue] = useState('');
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [showProductPicker, setShowProductPicker] = useState(false);
   const [showNewClient, setShowNewClient] = useState(false);
@@ -34,7 +36,18 @@ export default function NewSaleScreen() {
   const selectedClient = state.clients.find(c => c.id === selectedClientId);
 
   const totalFromItems = items.reduce((sum, i) => sum + i.totalPrice, 0);
-  const totalAmount = totalFromItems > 0 ? totalFromItems : (parseFloat(manualAmount.replace(',', '.')) || 0);
+  const subtotal = totalFromItems > 0 ? totalFromItems : (parseFloat(manualAmount.replace(',', '.')) || 0);
+
+  const discountAmount = (() => {
+    if (!discountValue || subtotal === 0) return 0;
+    const val = parseFloat(discountValue.replace(',', '.')) || 0;
+    if (discountType === 'percentage') {
+      return subtotal * (val / 100);
+    }
+    return val;
+  })();
+
+  const totalAmount = Math.max(0, subtotal - discountAmount);
 
   const toggleTag = (id: string) => {
     setSelectedTagIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
@@ -118,6 +131,9 @@ export default function NewSaleScreen() {
         clientId: selectedClientId,
         clientName: selectedClient?.name,
         items,
+        subtotal,
+        discountType: discountValue ? discountType : null,
+        discountValue: discountValue ? parseFloat(discountValue.replace(',', '.')) || 0 : 0,
         totalAmount,
         paymentType,
         status: 'pending',
@@ -233,6 +249,70 @@ export default function NewSaleScreen() {
             <View style={[styles.totalRow, { backgroundColor: colors.primary + '10' }]}>
               <Text style={[styles.totalLabel, { color: colors.primary }]}>Total</Text>
               <Text style={[styles.totalValue, { color: colors.primary }]}>{formatCurrency(totalAmount)}</Text>
+            </View>
+          )}
+
+          {/* Seção de Desconto - Only when using products */}
+          {totalFromItems > 0 && (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Desconto</Text>
+              <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={styles.discountToggle}>
+                  <Pressable
+                    onPress={() => setDiscountType('percentage')}
+                    style={[
+                      styles.discountBtn,
+                      { borderColor: colors.border },
+                      discountType === 'percentage' && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
+                  >
+                    <Text style={[styles.discountBtnText, { color: discountType === 'percentage' ? '#fff' : colors.foreground }]}>%</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setDiscountType('fixed')}
+                    style={[
+                      styles.discountBtn,
+                      { borderColor: colors.border },
+                      discountType === 'fixed' && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
+                  >
+                    <Text style={[styles.discountBtnText, { color: discountType === 'fixed' ? '#fff' : colors.foreground }]}>R$</Text>
+                  </Pressable>
+                </View>
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <View style={styles.inputRow}>
+                  <Text style={[styles.label, { color: colors.muted }]}>
+                    {discountType === 'percentage' ? 'Percentual' : 'Valor'}
+                  </Text>
+                  <TextInput
+                    style={[styles.input, { color: colors.foreground }]}
+                    value={discountValue}
+                    onChangeText={setDiscountValue}
+                    placeholder="0"
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
+
+              {/* Resumo com desconto */}
+              {discountAmount > 0 && (
+                <View style={[styles.discountSummary, { backgroundColor: colors.surface }]}>
+                  <View style={styles.discountRow}>
+                    <Text style={[styles.discountLabel, { color: colors.muted }]}>Subtotal</Text>
+                    <Text style={[styles.discountValue, { color: colors.foreground }]}>{formatCurrency(subtotal)}</Text>
+                  </View>
+                  <View style={styles.discountRow}>
+                    <Text style={[styles.discountLabel, { color: colors.muted }]}>
+                      Desconto ({discountType === 'percentage' ? `${discountValue}%` : formatCurrency(parseFloat(discountValue.replace(',', '.')) || 0)})
+                    </Text>
+                    <Text style={[styles.discountValue, { color: '#DC2626' }]}>-{formatCurrency(discountAmount)}</Text>
+                  </View>
+                  <View style={[styles.discountTotal, { borderTopColor: colors.border }]}>
+                    <Text style={[styles.discountLabel, { color: colors.primary, fontWeight: '700' }]}>Total</Text>
+                    <Text style={[styles.discountValue, { color: colors.primary, fontWeight: '700' }]}>{formatCurrency(totalAmount)}</Text>
+                  </View>
+                </View>
+              )}
             </View>
           )}
         </View>
@@ -366,7 +446,7 @@ export default function NewSaleScreen() {
                       Alert.alert('Atencao', 'Informe o nome do cliente.');
                       return;
                     }
-                    const newClient = await addClient({ name: newClientName.trim(), tagIds: [] });
+                    const newClient = await addClient({ name: newClientName.trim() });
                     setSelectedClientId(newClient.id);
                     setNewClientName('');
                     setShowNewClient(false);
@@ -423,4 +503,12 @@ const styles = StyleSheet.create({
   pickerItemText: { fontSize: 15, fontWeight: '500' },
   pickerItemSub: { fontSize: 13 },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#475569', alignSelf: 'center', marginBottom: 12 },
+  discountToggle: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
+  discountBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
+  discountBtnText: { fontSize: 13, fontWeight: '600' },
+  discountSummary: { padding: 12, gap: 8, borderRadius: 10, marginTop: 8 },
+  discountRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  discountLabel: { fontSize: 13 },
+  discountValue: { fontSize: 14, fontWeight: '600' },
+  discountTotal: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTopWidth: 0.5 },
 });

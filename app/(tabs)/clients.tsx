@@ -35,7 +35,6 @@ export default function ClientsScreen() {
   };
 
   const renderItem = ({ item }: { item: Client }) => {
-    const tags = state.tags.filter(t => item.tagIds.includes(t.id));
     const total = getClientTotal(item.id);
     const initials = getInitials(item.name);
 
@@ -63,11 +62,6 @@ export default function ClientsScreen() {
               </View>
             )}
           </View>
-          {tags.length > 0 && (
-            <View style={styles.tagsRow}>
-              {tags.map(tag => <TagChip key={tag.id} tag={tag} small />)}
-            </View>
-          )}
         </View>
         <View style={styles.totalBlock}>
           {total > 0 && <Text style={[styles.totalValue, { color: colors.primary }]}>{formatCurrency(total)}</Text>}

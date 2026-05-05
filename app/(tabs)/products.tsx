@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, Pressable, StyleSheet, Image } from 'react-native';
+import { View, Text, FlatList, TextInput, Pressable, StyleSheet, Image, Modal, ScrollView, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
@@ -11,24 +11,105 @@ import { useColors } from '@/hooks/use-colors';
 import { formatCurrency } from '@/lib/utils';
 import { Product } from '@/types';
 
+type StockFilter = 'all' | 'out' | 'low' | 'normal';
+type SortOption = 'name' | 'price_asc' | 'price_desc' | 'stock_asc' | 'stock_desc' | 'date_desc';
+
+const STOCK_FILTERS: { value: StockFilter; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'out', label: 'Esgotado' },
+  { value: 'low', label: 'Estoque baixo' },
+  { value: 'normal', label: 'Normal' },
+];
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'name', label: 'Nome' },
+  { value: 'price_asc', label: 'Menor preço' },
+  { value: 'price_desc', label: 'Maior preço' },
+  { value: 'stock_asc', label: 'Menor estoque' },
+  { value: 'stock_desc', label: 'Maior estoque' },
+  { value: 'date_desc', label: 'Mais recentes' },
+];
+
 export default function ProductsScreen() {
-  const { state } = useApp();
+  const { state, updateProduct } = useApp();
   const colors = useColors();
   const router = useRouter();
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [stockFilter, setStockFilter] = useState<StockFilter>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('name');
+  const [showFilters, setShowFilters] = useState(false);
+
+  // Get unique categories
+  const categories = useMemo(() => {
+    const cats = new Set<string>();
+    state.products.forEach(p => { if (p.category) cats.add(p.category); });
+    return Array.from(cats).sort();
+  }, [state.products]);
 
   const filtered = useMemo(() => {
-    const q = search.toLowerCase();
-    if (!q) return state.products;
-    return state.products.filter(p =>
-      p.name.toLowerCase().includes(q) ||
-      (p.category?.toLowerCase().includes(q)) ||
-      (p.description?.toLowerCase().includes(q))
-    );
-  }, [state.products, search]);
+    let result = [...state.products];
+
+    // Search filter
+    if (search) {
+      const q = search.toLowerCase();
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        (p.category?.toLowerCase().includes(q)) ||
+        (p.description?.toLowerCase().includes(q))
+      );
+    }
+
+    // Category filter
+    if (categoryFilter !== 'all') {
+      result = result.filter(p => p.category === categoryFilter);
+    }
+
+    // Stock filter
+    if (stockFilter !== 'all') {
+      result = result.filter(p => {
+        if (stockFilter === 'out') return p.stock <= 0;
+        if (stockFilter === 'low') return p.stock > 0 && p.stock <= 5;
+        if (stockFilter === 'normal') return p.stock > 5;
+        return true;
+      });
+    }
+
+    // Sorting
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'name':
+          return a.name.localeCompare(b.name);
+        case 'price_asc':
+          return a.salePrice - b.salePrice;
+        case 'price_desc':
+          return b.salePrice - a.salePrice;
+        case 'stock_asc':
+          return a.stock - b.stock;
+        case 'stock_desc':
+          return b.stock - a.stock;
+        case 'date_desc':
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [state.products, search, categoryFilter, stockFilter, sortBy]);
+
+  const handleQuickStockAdjust = async (product: Product, delta: number) => {
+    const newStock = Math.max(0, product.stock + delta);
+    if (newStock === product.stock) return;
+    
+    try {
+      await updateProduct({ ...product, stock: newStock });
+    } catch (error) {
+      Alert.alert('Erro', 'Não foi possível atualizar o estoque');
+    }
+  };
 
   const renderItem = ({ item }: { item: Product }) => {
-    const tags = state.tags.filter(t => item.tagIds.includes(t.id));
     const stockColor = item.stock <= 0 ? '#DC2626' : item.stock <= 5 ? '#D97706' : '#16A34A';
 
     return (
@@ -55,23 +136,40 @@ export default function ProductsScreen() {
             </View>
           </View>
         </View>
-        {tags.length > 0 && (
-          <View style={styles.tags}>
-            {tags.map(tag => <TagChip key={tag.id} tag={tag} small />)}
-          </View>
-        )}
+        <View style={styles.quickActions}>
+          <Pressable 
+            onPress={() => handleQuickStockAdjust(item, -1)}
+            style={[styles.quickBtn, { backgroundColor: colors.background }]}
+            disabled={item.stock <= 0}
+          >
+            <MaterialIcons name="remove" size={16} color={item.stock > 0 ? colors.foreground : colors.muted} />
+          </Pressable>
+          <Pressable 
+            onPress={() => handleQuickStockAdjust(item, 1)}
+            style={[styles.quickBtn, { backgroundColor: colors.background }]}
+          >
+            <MaterialIcons name="add" size={16} color={colors.foreground} />
+          </Pressable>
+        </View>
       </Pressable>
     );
   };
+
+  const hasFilters = categoryFilter !== 'all' || stockFilter !== 'all' || sortBy !== 'name';
 
   return (
     <ScreenContainer containerClassName="bg-background">
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Produtos</Text>
-        <Pressable onPress={() => router.push('/tags/index' as any)} style={({ pressed }) => [styles.tagBtn, pressed && { opacity: 0.7 }]}>
-          <MaterialIcons name="label" size={20} color={colors.primary} />
-          <Text style={[styles.tagBtnText, { color: colors.primary }]}>Tags</Text>
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable 
+            onPress={() => setShowFilters(true)}
+            style={({ pressed }) => [styles.filterBtn, hasFilters && { backgroundColor: colors.primary + '20' }, pressed && { opacity: 0.7 }]}
+          >
+            <MaterialIcons name="filter-list" size={20} color={hasFilters ? colors.primary : colors.muted} />
+            {hasFilters && <View style={[styles.filterDot, { backgroundColor: colors.primary }]} />}
+          </Pressable>
+        </View>
       </View>
 
       <View style={[styles.searchBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -91,6 +189,29 @@ export default function ProductsScreen() {
         )}
       </View>
 
+      {hasFilters && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.activeFilters} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingVertical: 8 }}>
+          {categoryFilter !== 'all' && (
+            <Pressable onPress={() => setCategoryFilter('all')} style={[styles.filterChip, { backgroundColor: colors.primary }]}>
+              <Text style={styles.filterChipText}>{categoryFilter}</Text>
+              <MaterialIcons name="close" size={14} color="#fff" />
+            </Pressable>
+          )}
+          {stockFilter !== 'all' && (
+            <Pressable onPress={() => setStockFilter('all')} style={[styles.filterChip, { backgroundColor: colors.primary }]}>
+              <Text style={styles.filterChipText}>{STOCK_FILTERS.find(f => f.value === stockFilter)?.label}</Text>
+              <MaterialIcons name="close" size={14} color="#fff" />
+            </Pressable>
+          )}
+          {sortBy !== 'name' && (
+            <Pressable onPress={() => setSortBy('name')} style={[styles.filterChip, { backgroundColor: colors.primary }]}>
+              <Text style={styles.filterChipText}>{SORT_OPTIONS.find(s => s.value === sortBy)?.label}</Text>
+              <MaterialIcons name="close" size={14} color="#fff" />
+            </Pressable>
+          )}
+        </ScrollView>
+      )}
+
       <View style={styles.statsRow}>
         <Text style={[styles.statsText, { color: colors.muted }]}>
           {filtered.length} produto{filtered.length !== 1 ? 's' : ''}
@@ -106,13 +227,77 @@ export default function ProductsScreen() {
           <EmptyState
             icon="inventory"
             title="Nenhum produto encontrado"
-            subtitle={search ? 'Tente outro termo de busca' : 'Toque no botão + para adicionar seu primeiro produto'}
+            subtitle={search || hasFilters ? 'Tente outros filtros' : 'Toque no botão + para adicionar seu primeiro produto'}
           />
         }
         showsVerticalScrollIndicator={false}
       />
 
       <FAB onPress={() => router.push('/products/new')} />
+
+      {/* Modal de filtros */}
+      <Modal visible={showFilters} transparent animationType="slide" onRequestClose={() => setShowFilters(false)}>
+        <Pressable style={styles.overlay} onPress={() => setShowFilters(false)}>
+          <View style={[styles.filterSheet, { backgroundColor: colors.surface }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Filtros</Text>
+
+            <Text style={[styles.filterLabel, { color: colors.muted }]}>Categoria</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              <Pressable
+                onPress={() => setCategoryFilter('all')}
+                style={[styles.filterOption, categoryFilter === 'all' && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+              >
+                <Text style={[styles.filterOptionText, { color: categoryFilter === 'all' ? '#fff' : colors.foreground }]}>Todos</Text>
+              </Pressable>
+              {categories.map(cat => (
+                <Pressable
+                  key={cat}
+                  onPress={() => setCategoryFilter(cat)}
+                  style={[styles.filterOption, categoryFilter === cat && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                >
+                  <Text style={[styles.filterOptionText, { color: categoryFilter === cat ? '#fff' : colors.foreground }]}>{cat}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <Text style={[styles.filterLabel, { color: colors.muted }]}>Estoque</Text>
+            <View style={styles.statusGrid}>
+              {STOCK_FILTERS.map(f => (
+                <Pressable
+                  key={f.value}
+                  onPress={() => setStockFilter(f.value)}
+                  style={[styles.filterOption, stockFilter === f.value && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                >
+                  <Text style={[styles.filterOptionText, { color: stockFilter === f.value ? '#fff' : colors.foreground }]}>{f.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[styles.filterLabel, { color: colors.muted }]}>Ordenar por</Text>
+            <View style={styles.statusGrid}>
+              {SORT_OPTIONS.map(s => (
+                <Pressable
+                  key={s.value}
+                  onPress={() => setSortBy(s.value)}
+                  style={[styles.filterOption, sortBy === s.value && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                >
+                  <Text style={[styles.filterOptionText, { color: sortBy === s.value ? '#fff' : colors.foreground }]}>{s.label}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <View style={styles.sheetActions}>
+              <Pressable onPress={() => { setCategoryFilter('all'); setStockFilter('all'); setSortBy('name'); }} style={[styles.sheetBtn, { backgroundColor: colors.background }]}>
+                <Text style={[styles.sheetBtnText, { color: colors.muted }]}>Limpar</Text>
+              </Pressable>
+              <Pressable onPress={() => setShowFilters(false)} style={[styles.sheetBtn, { backgroundColor: colors.primary }]}>
+                <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Aplicar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -127,6 +312,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
   },
   title: { fontSize: 22, fontWeight: '700' },
+  headerActions: { flexDirection: 'row', gap: 4 },
+  filterBtn: { padding: 8, borderRadius: 8, position: 'relative' },
+  filterDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
   tagBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6 },
   tagBtnText: { fontSize: 13, fontWeight: '600' },
   searchBar: {
@@ -138,6 +326,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
   },
   searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
+  activeFilters: { maxHeight: 50 },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  filterChipText: { color: '#fff', fontSize: 12, fontWeight: '600' },
   statsRow: { paddingHorizontal: 16, paddingVertical: 8 },
   statsText: { fontSize: 12 },
   list: { paddingHorizontal: 16, paddingBottom: 100 },
@@ -171,4 +362,17 @@ const styles = StyleSheet.create({
   stockBadge: { borderRadius: 6, paddingHorizontal: 6, paddingVertical: 2 },
   stockText: { fontSize: 11, fontWeight: '600' },
   tags: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 10, gap: 4 },
+  quickActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 8 },
+  quickBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6 },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  filterSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14, paddingBottom: 32 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#475569', alignSelf: 'center', marginBottom: 4 },
+  sheetTitle: { fontSize: 18, fontWeight: '700' },
+  filterLabel: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  filterOption: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#334155' },
+  filterOptionText: { fontSize: 13, fontWeight: '500' },
+  statusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  sheetActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  sheetBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  sheetBtnText: { fontSize: 15, fontWeight: '600' },
 });

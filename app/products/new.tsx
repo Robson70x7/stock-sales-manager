@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
-import { TagChip } from '@/components/ui/TagChip';
+// import { TagChip } from '@/components/ui/TagChip';
 import { persistImage } from '@/lib/imageUtils';
 
 export default function NewProductScreen() {
@@ -20,13 +20,8 @@ export default function NewProductScreen() {
   const [salePrice, setSalePrice] = useState('');
   const [stock, setStock] = useState('');
   const [unit, setUnit] = useState('un');
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-
-  const toggleTag = (id: string) => {
-    setSelectedTagIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
-  };
 
   const parsePrice = (val: string) => {
     const cleaned = val.replace(/[^0-9,\.]/g, '').replace(',', '.');
@@ -82,7 +77,6 @@ export default function NewProductScreen() {
         stock: parseInt(stock) || 0,
         unit: unit.trim() || 'un',
         photoUri: persistedPhotoUri || undefined,
-        tagIds: selectedTagIds,
       });
       router.back();
     } catch (e) {
@@ -153,17 +147,6 @@ export default function NewProductScreen() {
             </View>
           </View>
         </View>
-
-        {state.tags.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tags</Text>
-            <View style={styles.tagsWrap}>
-              {state.tags.map(tag => (
-                <TagChip key={tag.id} tag={tag} selected={selectedTagIds.includes(tag.id)} onPress={() => toggleTag(tag.id)} />
-              ))}
-            </View>
-          </View>
-        )}
 
         <Pressable
           onPress={handleSave}

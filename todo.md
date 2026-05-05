@@ -123,10 +123,3 @@
 - [x] Compilar versão desktop
 - [x] Gerar arquivo portável para Windows
 
-## Próximos Passos (v2.1+)
-- [ ] Testar sincronização P2P em rede real
-- [ ] Implementar adaptador Backend (futuro)
-- [ ] Implementar adaptador Híbrido (futuro)
-- [ ] Adicionar ícone customizado para desktop
-- [ ] Gerar instalador NSIS no Windows
-- [ ] Exportar/compartilhar relatório (futuro)

@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, TextInput, Pressable, StyleSheet, ScrollView, Modal } from 'react-native';
+import React, { useState, useMemo, useCallback } from 'react';
+import { View, Text, FlatList, TextInput, Pressable, StyleSheet, ScrollView, Modal, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
@@ -31,6 +31,16 @@ const STATUSES: { value: SaleStatus | 'all'; label: string }[] = [
   { value: 'cancelled', label: 'Cancelado' },
 ];
 
+type SortOption = 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc' | 'client_name';
+
+const SORT_OPTIONS: { value: SortOption; label: string }[] = [
+  { value: 'date_desc', label: 'Mais recentes' },
+  { value: 'date_asc', label: 'Mais antigas' },
+  { value: 'amount_desc', label: 'Maior valor' },
+  { value: 'amount_asc', label: 'Menor valor' },
+  { value: 'client_name', label: 'Cliente' },
+];
+
 const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 export default function SalesScreen() {
@@ -41,6 +51,9 @@ export default function SalesScreen() {
   const [filterPayment, setFilterPayment] = useState<PaymentType | 'all'>('all');
   const [filterStatus, setFilterStatus] = useState<SaleStatus | 'all'>('all');
   const [showFilters, setShowFilters] = useState(false);
+  const [sortBy, setSortBy] = useState<SortOption>('date_desc');
+  const [showSort, setShowSort] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
@@ -77,8 +90,25 @@ export default function SalesScreen() {
 
   const filtered = useMemo(() => {
     let result = [...state.sales]
-      .filter(s => isInMonth(s.saleDate, currentYear, currentMonth) || hasParcelsInMonth(s, currentYear, currentMonth))
-      .sort((a, b) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime());
+      .filter(s => isInMonth(s.saleDate, currentYear, currentMonth) || hasParcelsInMonth(s, currentYear, currentMonth));
+
+    // Apply sorting
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'date_desc':
+          return new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime();
+        case 'date_asc':
+          return new Date(a.saleDate).getTime() - new Date(b.saleDate).getTime();
+        case 'amount_desc':
+          return b.totalAmount - a.totalAmount;
+        case 'amount_asc':
+          return a.totalAmount - b.totalAmount;
+        case 'client_name':
+          return (a.clientName || '').localeCompare(b.clientName || '');
+        default:
+          return 0;
+      }
+    });
 
     if (search) {
       const q = search.toLowerCase();
@@ -92,7 +122,32 @@ export default function SalesScreen() {
     if (filterPayment !== 'all') result = result.filter(s => s.paymentType === filterPayment);
     if (filterStatus !== 'all') result = result.filter(s => s.status === filterStatus);
     return result;
-  }, [state.sales, state.tags, search, filterPayment, filterStatus, currentMonth, currentYear, isInMonth, hasParcelsInMonth]);
+  }, [state.sales, state.tags, search, filterPayment, filterStatus, currentMonth, currentYear, isInMonth, hasParcelsInMonth, sortBy]);
+
+  // Calculate monthly summary
+  const monthlySummary = useMemo(() => {
+    const salesInMonth = state.sales.filter(s => 
+      isInMonth(s.saleDate, currentYear, currentMonth) || hasParcelsInMonth(s, currentYear, currentMonth)
+    );
+
+    const totalRevenue = salesInMonth
+      .filter(s => s.status !== 'cancelled')
+      .reduce((sum, s) => sum + s.totalAmount, 0);
+
+    const totalReceived = salesInMonth
+      .filter(s => s.status === 'paid')
+      .reduce((sum, s) => sum + s.totalAmount, 0) +
+      salesInMonth
+        .flatMap(s => s.installments)
+        .filter(i => isInMonth(i.dueDate, currentYear, currentMonth) && i.status === 'paid')
+        .reduce((sum, i) => sum + i.amount, 0);
+
+    const pending = totalRevenue - totalReceived;
+    const salesCount = salesInMonth.filter(s => s.status !== 'cancelled').length;
+    const averageValue = salesCount > 0 ? totalRevenue / salesCount : 0;
+
+    return { totalRevenue, totalReceived, pending, salesCount, averageValue };
+  }, [state.sales, currentMonth, currentYear, isInMonth, hasParcelsInMonth]);
 
   const hasFilters = filterPayment !== 'all' || filterStatus !== 'all';
 
@@ -144,13 +199,21 @@ export default function SalesScreen() {
     <ScreenContainer containerClassName="bg-background">
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Vendas</Text>
-        <Pressable
-          onPress={() => setShowFilters(true)}
-          style={({ pressed }) => [styles.filterBtn, hasFilters && { backgroundColor: colors.primary + '20' }, pressed && { opacity: 0.7 }]}
-        >
-          <MaterialIcons name="filter-list" size={20} color={hasFilters ? colors.primary : colors.muted} />
-          {hasFilters && <View style={[styles.filterDot, { backgroundColor: colors.primary }]} />}
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            onPress={() => setShowSort(true)}
+            style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.7 }]}
+          >
+            <MaterialIcons name="sort" size={20} color={colors.muted} />
+          </Pressable>
+          <Pressable
+            onPress={() => setShowFilters(true)}
+            style={({ pressed }) => [styles.filterBtn, hasFilters && { backgroundColor: colors.primary + '20' }, pressed && { opacity: 0.7 }]}
+          >
+            <MaterialIcons name="filter-list" size={20} color={hasFilters ? colors.primary : colors.muted} />
+            {hasFilters && <View style={[styles.filterDot, { backgroundColor: colors.primary }]} />}
+          </Pressable>
+        </View>
       </View>
 
       {/* Navegação por mês */}
@@ -164,6 +227,29 @@ export default function SalesScreen() {
         <Pressable onPress={handleNextMonth} style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.6 }]}>
           <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
         </Pressable>
+      </View>
+
+      {/* Cards de resumo */}
+      <View style={[styles.summaryContainer, { backgroundColor: colors.surface }]}>
+        <View style={styles.summaryRow}>
+          <View style={[styles.summaryCard, { backgroundColor: colors.background }]}>
+            <Text style={[styles.summaryLabel, { color: colors.muted }]}>Receitas</Text>
+            <Text style={[styles.summaryValue, { color: colors.foreground }]}>{formatCurrency(monthlySummary.totalRevenue)}</Text>
+            <Text style={[styles.summarySubtext, { color: colors.muted }]}>{monthlySummary.salesCount} vendas</Text>
+          </View>
+          <View style={[styles.summaryCard, { backgroundColor: colors.background }]}>
+            <Text style={[styles.summaryLabel, { color: colors.muted }]}>Recebido</Text>
+            <Text style={[styles.summaryValue, { color: '#22c55e' }]}>{formatCurrency(monthlySummary.totalReceived)}</Text>
+            <Text style={[styles.summarySubtext, { color: colors.muted }]}>Média: {formatCurrency(monthlySummary.averageValue)}</Text>
+          </View>
+        </View>
+        <View style={styles.summaryRow}>
+          <View style={[styles.summaryCard, { backgroundColor: colors.background }]}>
+            <Text style={[styles.summaryLabel, { color: colors.muted }]}>Pendente</Text>
+            <Text style={[styles.summaryValue, { color: monthlySummary.pending > 0 ? '#f59e0b' : colors.muted }]}>{formatCurrency(monthlySummary.pending)}</Text>
+            <Text style={[styles.summarySubtext, { color: colors.muted }]}>A receber</Text>
+          </View>
+        </View>
       </View>
 
       <View style={[styles.searchBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -213,6 +299,13 @@ export default function SalesScreen() {
           />
         }
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       />
 
       <FAB onPress={() => router.push('/sales/new' as any)} />
@@ -261,6 +354,33 @@ export default function SalesScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      {/* Modal de ordenação */}
+      <Modal visible={showSort} transparent animationType="slide" onRequestClose={() => setShowSort(false)}>
+        <Pressable style={styles.overlay} onPress={() => setShowSort(false)}>
+          <View style={[styles.filterSheet, { backgroundColor: colors.surface }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Ordenar</Text>
+
+            <View style={styles.sortOptions}>
+              {SORT_OPTIONS.map(option => (
+                <Pressable
+                  key={option.value}
+                  onPress={() => { setSortBy(option.value); setShowSort(false); }}
+                  style={[styles.sortOption, sortBy === option.value && { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
+                >
+                  <Text style={[styles.sortOptionText, { color: sortBy === option.value ? colors.primary : colors.foreground }]}>{option.label}</Text>
+                  {sortBy === option.value && <MaterialIcons name="check" size={20} color={colors.primary} />}
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable onPress={() => setShowSort(false)} style={[styles.sheetBtn, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Fechar</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -268,11 +388,19 @@ export default function SalesScreen() {
 const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5 },
   title: { fontSize: 22, fontWeight: '700' },
+  headerActions: { flexDirection: 'row', gap: 4 },
+  headerBtn: { padding: 8, borderRadius: 8 },
   filterBtn: { padding: 8, borderRadius: 8, position: 'relative' },
   filterDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
   monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5 },
   navBtn: { padding: 8 },
   monthText: { fontSize: 16, fontWeight: '600' },
+  summaryContainer: { paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+  summaryRow: { flexDirection: 'row', gap: 10 },
+  summaryCard: { flex: 1, padding: 12, borderRadius: 10 },
+  summaryLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  summaryValue: { fontSize: 18, fontWeight: '700' },
+  summarySubtext: { fontSize: 11, marginTop: 2 },
   searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 10, borderBottomWidth: 0.5 },
   searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
   activeFilters: { maxHeight: 50 },
@@ -302,4 +430,7 @@ const styles = StyleSheet.create({
   sheetActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
   sheetBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
   sheetBtnText: { fontSize: 15, fontWeight: '600' },
+  sortOptions: { gap: 8 },
+  sortOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 10, borderWidth: 1, borderColor: '#334155' },
+  sortOptionText: { fontSize: 15, fontWeight: '500' },
 });

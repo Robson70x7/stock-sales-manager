@@ -23,7 +23,6 @@ export default function EditProductScreen() {
   const [salePrice, setSalePrice] = useState(product?.salePrice?.toString() || '');
   const [stock, setStock] = useState(product?.stock?.toString() || '');
   const [unit, setUnit] = useState(product?.unit || 'un');
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(product?.tagIds || []);
   const [photoUri, setPhotoUri] = useState<string | null>(product?.photoUri || null);
   const [saving, setSaving] = useState(false);
 
@@ -56,10 +55,6 @@ export default function EditProductScreen() {
 
   if (!product) return null;
 
-  const toggleTag = (id: string) => {
-    setSelectedTagIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
-  };
-
   const parsePrice = (val: string) => {
     const cleaned = val.replace(/[^0-9,\.]/g, '').replace(',', '.');
     return parseFloat(cleaned) || 0;
@@ -86,7 +81,6 @@ export default function EditProductScreen() {
         stock: parseInt(stock) || 0,
         unit: unit.trim() || 'un',
         photoUri: finalPhotoUri || undefined,
-        tagIds: selectedTagIds,
       });
       router.back();
     } catch (e) {
@@ -157,17 +151,6 @@ export default function EditProductScreen() {
             </View>
           </View>
         </View>
-
-        {state.tags.length > 0 && (
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tags</Text>
-            <View style={styles.tagsWrap}>
-              {state.tags.map(tag => (
-                <TagChip key={tag.id} tag={tag} selected={selectedTagIds.includes(tag.id)} onPress={() => toggleTag(tag.id)} />
-              ))}
-            </View>
-          </View>
-        )}
 
         <Pressable
           onPress={handleSave}

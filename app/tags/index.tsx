@@ -57,15 +57,7 @@ export default function TagsScreen() {
     setDeleteId(null);
   };
 
-  const getTagCount = (tagId: string) => {
-    const inProducts = state.products.filter(p => p.tagIds.includes(tagId)).length;
-    const inClients = state.clients.filter(c => c.tagIds.includes(tagId)).length;
-    const inSales = state.sales.filter(s => s.tagIds.includes(tagId)).length;
-    return inProducts + inClients + inSales;
-  };
-
   const renderTag = ({ item }: { item: Tag }) => {
-    const count = getTagCount(item.id);
     return (
       <Pressable
         onPress={() => router.push(`/tags/${item.id}` as any)}
@@ -74,7 +66,6 @@ export default function TagsScreen() {
         <View style={[styles.colorDot, { backgroundColor: item.color }]} />
         <View style={styles.tagInfo}>
           <Text style={[styles.tagName, { color: colors.foreground }]}>{item.name}</Text>
-          <Text style={[styles.tagCount, { color: colors.muted }]}>{count} item{count !== 1 ? 's' : ''}</Text>
         </View>
         <View style={styles.tagActions}>
           <Pressable onPress={() => openEdit(item)} style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.6 }]}>

@@ -94,6 +94,8 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    "expo-sqlite",
+    "expo-web-browser",
     [
       "expo-image-picker",
       {

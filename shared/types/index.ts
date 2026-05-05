@@ -22,8 +22,7 @@ export interface Product {
   salePrice: number;
   stock: number;
   unit?: string;
-  photoUri?: string; // Base64 ou URI local da foto do produto
-  tagIds: string[];
+  photoUri?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -31,12 +30,11 @@ export interface Product {
 export interface Client {
   id: string;
   name: string;
-  document?: string; // CPF ou CNPJ
+  document?: string;
   phone?: string;
   email?: string;
   address?: string;
   notes?: string;
-  tagIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -73,6 +71,9 @@ export interface Sale {
   clientName?: string;
   description?: string;
   items: SaleItem[];
+  subtotal: number;
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue: number;
   totalAmount: number;
   paymentType: PaymentType;
   status: SaleStatus;
@@ -80,7 +81,7 @@ export interface Sale {
   installments: Installment[];
   tagIds: string[];
   saleDate: string;
-  firstInstallmentDate: string; // Data da primeira parcela
+  firstInstallmentDate?: string;
   createdAt: string;
   updatedAt: string;
 }
