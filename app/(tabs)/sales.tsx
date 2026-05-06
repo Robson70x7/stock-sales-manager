@@ -19,8 +19,6 @@ const PAYMENT_TYPES: { value: PaymentType | 'all'; label: string }[] = [
   { value: 'pix', label: 'PIX' },
   { value: 'credit_card', label: 'Crédito' },
   { value: 'debit_card', label: 'Débito' },
-  { value: 'bank_transfer', label: 'Transferência' },
-  { value: 'installment', label: 'Parcelado' },
 ];
 
 const STATUSES: { value: SaleStatus | 'all'; label: string }[] = [
@@ -197,33 +195,18 @@ export default function SalesScreen() {
 
   return (
     <ScreenContainer containerClassName="bg-background">
+      {/* Header compacto com navegação de mês integrada */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Text style={[styles.title, { color: colors.foreground }]}>Vendas</Text>
-        <View style={styles.headerActions}>
-          <Pressable
-            onPress={() => setShowSort(true)}
-            style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.7 }]}
-          >
-            <MaterialIcons name="sort" size={20} color={colors.muted} />
-          </Pressable>
-          <Pressable
-            onPress={() => setShowFilters(true)}
-            style={({ pressed }) => [styles.filterBtn, hasFilters && { backgroundColor: colors.primary + '20' }, pressed && { opacity: 0.7 }]}
-          >
-            <MaterialIcons name="filter-list" size={20} color={hasFilters ? colors.primary : colors.muted} />
-            {hasFilters && <View style={[styles.filterDot, { backgroundColor: colors.primary }]} />}
-          </Pressable>
-        </View>
-      </View>
-
-      {/* Navegação por mês */}
-      <View style={[styles.monthNav, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Pressable onPress={handlePrevMonth} style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.6 }]}>
           <MaterialIcons name="chevron-left" size={24} color={colors.primary} />
         </Pressable>
-        <Text style={[styles.monthText, { color: colors.foreground }]}>
-          {MONTHS[currentMonth]} {currentYear}
-        </Text>
+        <View style={styles.monthTitle}>
+          <Text style={[styles.monthText, { color: colors.foreground }]}>
+            {MONTHS[currentMonth]} {currentYear}
+          </Text>
+        </View>
+        
+        
         <Pressable onPress={handleNextMonth} style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.6 }]}>
           <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
         </Pressable>
@@ -241,15 +224,14 @@ export default function SalesScreen() {
             <Text style={[styles.summaryLabel, { color: colors.muted }]}>Recebido</Text>
             <Text style={[styles.summaryValue, { color: '#22c55e' }]}>{formatCurrency(monthlySummary.totalReceived)}</Text>
             <Text style={[styles.summarySubtext, { color: colors.muted }]}>Média: {formatCurrency(monthlySummary.averageValue)}</Text>
-          </View>
-        </View>
-        <View style={styles.summaryRow}>
+          </View> 
           <View style={[styles.summaryCard, { backgroundColor: colors.background }]}>
             <Text style={[styles.summaryLabel, { color: colors.muted }]}>Pendente</Text>
             <Text style={[styles.summaryValue, { color: monthlySummary.pending > 0 ? '#f59e0b' : colors.muted }]}>{formatCurrency(monthlySummary.pending)}</Text>
             <Text style={[styles.summarySubtext, { color: colors.muted }]}>A receber</Text>
           </View>
         </View>
+        
       </View>
 
       <View style={[styles.searchBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -267,6 +249,21 @@ export default function SalesScreen() {
             <MaterialIcons name="close" size={18} color={colors.muted} />
           </Pressable>
         )}
+        <View style={[styles.headerActions, styles.separatorLeft]}>
+          <Pressable
+            onPress={() => setShowSort(true)}
+            style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.7 }]}
+          >
+            <MaterialIcons name="sort" size={20} color={colors.muted} />
+          </Pressable>
+          <Pressable
+            onPress={() => setShowFilters(true)}
+            style={({ pressed }) => [styles.filterBtn, hasFilters && { backgroundColor: colors.primary + '20' }, pressed && { opacity: 0.7 }]}
+          >
+            <MaterialIcons name="filter-list" size={20} color={hasFilters ? colors.primary : colors.muted} />
+            {hasFilters && <View style={[styles.filterDot, { backgroundColor: colors.primary }]} />}
+          </Pressable>
+        </View>
       </View>
 
       {hasFilters && (
@@ -386,22 +383,24 @@ export default function SalesScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 0.5 },
-  title: { fontSize: 22, fontWeight: '700' },
+  separatorLeft: { borderLeftColor: "#334155", borderLeftWidth: 1 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 4, paddingVertical: 8, borderBottomWidth: 0.5 },
+  title: { fontSize: 18, fontWeight: '700' },
   headerActions: { flexDirection: 'row', gap: 4 },
   headerBtn: { padding: 8, borderRadius: 8 },
   filterBtn: { padding: 8, borderRadius: 8, position: 'relative' },
   filterDot: { position: 'absolute', top: 6, right: 6, width: 8, height: 8, borderRadius: 4 },
-  monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 0.5 },
+  monthNav: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 0.5 },
   navBtn: { padding: 8 },
+  monthTitle: { alignItems: 'center', flex: 1, flexDirection: 'row', justifyContent: 'center', gap: 6 },
   monthText: { fontSize: 16, fontWeight: '600' },
-  summaryContainer: { paddingHorizontal: 16, paddingVertical: 12, gap: 10 },
+  summaryContainer: { paddingHorizontal: 16, paddingVertical: 8, gap: 10 },
   summaryRow: { flexDirection: 'row', gap: 10 },
   summaryCard: { flex: 1, padding: 12, borderRadius: 10 },
   summaryLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   summaryValue: { fontSize: 18, fontWeight: '700' },
   summarySubtext: { fontSize: 11, marginTop: 2 },
-  searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, gap: 10, borderBottomWidth: 0.5 },
+  searchBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 8, gap: 10, borderBottomWidth: 0.5 },
   searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
   activeFilters: { maxHeight: 50 },
   filterChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },

@@ -2,7 +2,7 @@
 // Tipos principais do aplicativo VendaFácil
 // ============================================================
 
-export type PaymentType = 'cash' | 'pix' | 'credit_card' | 'debit_card' | 'bank_transfer' | 'installment';
+export type PaymentType = 'cash' | 'pix' | 'credit_card' | 'debit_card';
 export type SaleStatus = 'pending' | 'partial' | 'paid' | 'cancelled';
 export type InstallmentStatus = 'pending' | 'paid' | 'overdue';
 

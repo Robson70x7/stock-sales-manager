@@ -79,7 +79,7 @@ export default function NewProductScreen() {
         photoUri: persistedPhotoUri || undefined,
       });
       router.back();
-    } catch (e) {
+    } catch {
       Alert.alert('Erro', 'Não foi possível salvar o produto.');
     } finally {
       setSaving(false);

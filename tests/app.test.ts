@@ -68,12 +68,12 @@ describe('getPaymentTypeLabel', () => {
     expect(getPaymentTypeLabel('pix')).toBe('PIX');
   });
 
-  it('retorna label de cartão de crédito', () => {
-    expect(getPaymentTypeLabel('credit_card')).toBe('Cartão de Crédito');
+  it('retorna label de crédito', () => {
+    expect(getPaymentTypeLabel('credit_card')).toBe('Crédito');
   });
 
-  it('retorna label de parcelado', () => {
-    expect(getPaymentTypeLabel('installment')).toBe('Parcelado');
+  it('retorna label de débito', () => {
+    expect(getPaymentTypeLabel('debit_card')).toBe('Débito');
   });
 });
 

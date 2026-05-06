@@ -5,10 +5,11 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
-import { formatCurrency, getPaymentTypeLabel } from '@/lib/utils';
+import { DatePickerField } from '@/components/ui/DatePickerField';
+import { formatCurrency, getPaymentTypeLabel, generateInstallments } from '@/lib/utils';
 import { PaymentType, SaleStatus } from '@/types';
 
-const PAYMENT_TYPES: PaymentType[] = ['cash', 'pix', 'credit_card', 'debit_card', 'bank_transfer', 'installment'];
+const PAYMENT_TYPES: PaymentType[] = ['cash', 'pix', 'credit_card', 'debit_card'];
 const STATUSES: { value: SaleStatus; label: string }[] = [
   { value: 'pending', label: 'Pendente' },
   { value: 'partial', label: 'Parcial' },
@@ -29,12 +30,18 @@ export default function EditSaleScreen() {
   const [status, setStatus] = useState<SaleStatus>(sale?.status || 'pending');
   const [saleDate, setSaleDate] = useState(sale?.saleDate ? sale.saleDate.split('T')[0] : '');
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>(sale?.tagIds || []);
+  const [installmentsCount, setInstallmentsCount] = useState(sale?.installmentsCount || 1);
+  const [firstInstallmentDate, setFirstInstallmentDate] = useState(
+    sale?.firstInstallmentDate ? sale.firstInstallmentDate.split('T')[0] : saleDate
+  );
   const [showClientPicker, setShowClientPicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
   if (!sale) return null;
 
   const selectedClient = state.clients.find(c => c.id === selectedClientId);
+  const isCredit = paymentType === 'credit_card';
+  const totalAmount = sale.totalAmount;
 
   const toggleTag = (tagId: string) => {
     setSelectedTagIds(prev => prev.includes(tagId) ? prev.filter(t => t !== tagId) : [...prev, tagId]);
@@ -43,15 +50,45 @@ export default function EditSaleScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      // Para crédito: manter como pagamento único e já pago
+      const finalInstallmentsCount = isCredit ? 1 : installmentsCount;
+      const finalStatus = isCredit ? 'paid' as const : status;
+
+      // Regerar parcelas se necessário (apenas para não-crédito com múltiplas parcelas)
+      let installments = sale.installments;
+      if (!isCredit && installmentsCount > 1) {
+        installments = generateInstallments(sale.id, totalAmount, installmentsCount, firstInstallmentDate);
+      } else if (isCredit) {
+        // Para crédito: uma parcela paga
+        installments = [{
+          id: sale.installments[0]?.id || Date.now().toString(36) + 'i',
+          saleId: sale.id,
+          number: 1,
+          totalInstallments: 1,
+          amount: totalAmount,
+          dueDate: firstInstallmentDate,
+          status: 'paid' as const,
+          paidDate: new Date().toISOString(),
+          history: [{
+            date: new Date().toISOString(),
+            status: 'paid' as const,
+            notes: 'Pago - Cartão de Crédito',
+          }],
+        }];
+      }
+
       await updateSale({
         ...sale,
         description: description.trim() || undefined,
         clientId: selectedClientId,
         clientName: selectedClient?.name,
         paymentType,
-        status,
+        status: finalStatus,
         saleDate: new Date(saleDate).toISOString(),
         tagIds: selectedTagIds,
+        installmentsCount: finalInstallmentsCount,
+        installments,
+        firstInstallmentDate: new Date(firstInstallmentDate).toISOString(),
       });
       router.back();
     } catch (e) {
@@ -125,6 +162,46 @@ export default function EditSaleScreen() {
               </Pressable>
             ))}
           </ScrollView>
+
+          {/* Opção de parcelas apenas para não-crédito */}
+          {!isCredit && (
+            <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
+              <View style={styles.inputRow}>
+                <Text style={[styles.label, { color: colors.muted }]}>Nº de Parcelas</Text>
+                <View style={styles.qtyControl}>
+                  <Pressable onPress={() => setInstallmentsCount(Math.max(1, installmentsCount - 1))} style={styles.qtyBtn}>
+                    <MaterialIcons name="remove" size={16} color={colors.primary} />
+                  </Pressable>
+                  <Text style={[styles.qtyText, { color: colors.foreground }]}>{installmentsCount}x</Text>
+                  <Pressable onPress={() => setInstallmentsCount(Math.min(60, installmentsCount + 1))} style={styles.qtyBtn}>
+                    <MaterialIcons name="add" size={16} color={colors.primary} />
+                  </Pressable>
+                </View>
+              </View>
+              {totalAmount > 0 && installmentsCount > 1 && (
+                <View style={styles.inputRow}>
+                  <Text style={[styles.label, { color: colors.muted }]}>Valor por Parcela</Text>
+                  <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>{formatCurrency(totalAmount / installmentsCount)}</Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Data da primeira parcela apenas para não-crédito */}
+          {!isCredit && (
+            <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
+              <View style={styles.inputRow}>
+                <Text style={[styles.label, { color: colors.muted }]}>Data da 1ª Parcela</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.foreground }]}
+                  value={firstInstallmentDate}
+                  onChangeText={setFirstInstallmentDate}
+                  placeholder="AAAA-MM-DD"
+                  placeholderTextColor={colors.muted}
+                />
+              </View>
+            </View>
+          )}
         </View>
 
         {state.tags.length > 0 && (
@@ -189,6 +266,9 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 13, fontWeight: '500' },
   paymentOption: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   paymentText: { fontSize: 13, fontWeight: '500' },
+  qtyControl: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  qtyBtn: { width: 28, height: 28, borderRadius: 14, backgroundColor: '#1E293B', alignItems: 'center', justifyContent: 'center' },
+  qtyText: { fontSize: 14, fontWeight: '600', minWidth: 24, textAlign: 'center' },
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: 14, marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },

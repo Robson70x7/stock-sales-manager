@@ -13,8 +13,6 @@ const PAYMENT_TYPES: { value: PaymentType | 'all'; label: string }[] = [
   { value: 'pix', label: 'PIX' },
   { value: 'credit_card', label: 'Crédito' },
   { value: 'debit_card', label: 'Débito' },
-  { value: 'bank_transfer', label: 'Transferência' },
-  { value: 'installment', label: 'Parcelado' },
 ];
 
 export default function ReportsScreen() {

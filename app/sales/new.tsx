@@ -6,10 +6,10 @@ import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
 import { DatePickerField } from '@/components/ui/DatePickerField';
-import { generateInstallments, formatCurrency, getPaymentTypeLabel } from '@/lib/utils';
+import { generateInstallments, formatCurrency, getPaymentTypeLabel, applyCurrencyMask, unmaskCurrency } from '@/lib/utils';
 import { PaymentType, SaleItem } from '@/types';
 
-const PAYMENT_TYPES: PaymentType[] = ['cash', 'pix', 'credit_card', 'debit_card', 'bank_transfer', 'installment'];
+const PAYMENT_TYPES: PaymentType[] = ['cash', 'pix', 'credit_card', 'debit_card'];
 
 export default function NewSaleScreen() {
   const { state, addSale, addClient } = useApp();
@@ -36,11 +36,11 @@ export default function NewSaleScreen() {
   const selectedClient = state.clients.find(c => c.id === selectedClientId);
 
   const totalFromItems = items.reduce((sum, i) => sum + i.totalPrice, 0);
-  const subtotal = totalFromItems > 0 ? totalFromItems : (parseFloat(manualAmount.replace(',', '.')) || 0);
+  const subtotal = totalFromItems > 0 ? totalFromItems : unmaskCurrency(manualAmount);
 
   const discountAmount = (() => {
     if (!discountValue || subtotal === 0) return 0;
-    const val = parseFloat(discountValue.replace(',', '.')) || 0;
+    const val = discountType === 'percentage' ? parseFloat(discountValue.replace(',', '.')) || 0 : unmaskCurrency(discountValue);
     if (discountType === 'percentage') {
       return subtotal * (val / 100);
     }
@@ -107,9 +107,14 @@ export default function NewSaleScreen() {
     setSaving(true);
     try {
       const saleId = Date.now().toString(36);
-      const isInstallment = paymentType === 'installment' || installmentsCount > 1;
-      const count = isInstallment ? installmentsCount : 1;
-      const installments = count > 1
+      console.log('Iniciando salvamento da venda:', { saleId, totalAmount, itemsCount: items.length, paymentType });
+
+      // Para crédito: pagamento único e já pago
+      const isCredit = paymentType === 'credit_card';
+      const count = isCredit ? 1 : installmentsCount;
+      const saleStatus = isCredit ? 'paid' as const : 'pending' as const;
+
+      const installments = count > 1 && !isCredit
         ? generateInstallments(saleId, totalAmount, count, firstInstallmentDate)
         : [{
             id: Date.now().toString(36) + 'i',
@@ -118,34 +123,41 @@ export default function NewSaleScreen() {
             totalInstallments: 1,
             amount: totalAmount,
             dueDate: firstInstallmentDate,
-            status: 'pending' as const,
+            status: isCredit ? 'paid' as const : 'pending' as const,
+            paidDate: isCredit ? new Date().toISOString() : undefined,
             history: [{
               date: new Date().toISOString(),
-              status: 'pending' as const,
-              notes: 'Parcela criada',
+              status: isCredit ? 'paid' as const : 'pending' as const,
+              notes: isCredit ? 'Pago - Cartão de Crédito' : 'Parcela criada',
             }],
           }];
 
+      console.log('Chamando addSale com:', { itemsCount: items.length, installmentsCount: installments.length });
+      
       await addSale({
+        id: saleId,
         description: description.trim() || undefined,
         clientId: selectedClientId,
         clientName: selectedClient?.name,
         items,
         subtotal,
         discountType: discountValue ? discountType : null,
-        discountValue: discountValue ? parseFloat(discountValue.replace(',', '.')) || 0 : 0,
+        discountValue: discountValue ? (discountType === 'percentage' ? parseFloat(discountValue.replace(',', '.')) || 0 : unmaskCurrency(discountValue)) : 0,
         totalAmount,
         paymentType,
-        status: 'pending',
+        status: saleStatus,
         installmentsCount: count,
         installments,
         tagIds: selectedTagIds,
         saleDate: new Date(saleDate).toISOString(),
         firstInstallmentDate: new Date(firstInstallmentDate).toISOString(),
       });
+      
+      console.log('Venda salva com sucesso!');
       router.back();
     } catch (e) {
-      Alert.alert('Erro', 'Não foi possível salvar a venda.');
+      console.error('Erro ao salvar venda:', e);
+      Alert.alert('Erro', `Não foi possível salvar a venda: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
     } finally {
       setSaving(false);
     }
@@ -170,12 +182,14 @@ export default function NewSaleScreen() {
               placeholder="Selecione a data"
             />
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <DatePickerField
-              label="Data da 1ª Parcela"
-              value={firstInstallmentDate}
-              onChange={setFirstInstallmentDate}
-              placeholder="Selecione a data"
-            />
+            {paymentType !== 'credit_card' && (
+              <DatePickerField
+                label="Data da 1ª Parcela"
+                value={firstInstallmentDate}
+                onChange={setFirstInstallmentDate}
+                placeholder="Selecione a data"
+              />
+            )}
           </View>
         </View>
 
@@ -241,7 +255,14 @@ export default function NewSaleScreen() {
             <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.inputRow}>
                 <Text style={[styles.label, { color: colors.muted }]}>Valor Total *</Text>
-                <TextInput style={[styles.input, { color: colors.foreground }]} value={manualAmount} onChangeText={setManualAmount} placeholder="0,00" placeholderTextColor={colors.muted} keyboardType="decimal-pad" />
+                <TextInput 
+                  style={[styles.input, { color: colors.foreground }]} 
+                  value={manualAmount} 
+                  onChangeText={(text) => setManualAmount(applyCurrencyMask(text))} 
+                  placeholder="R$ 0,00" 
+                  placeholderTextColor={colors.muted} 
+                  keyboardType="numeric" 
+                />
               </View>
             </View>
           )}
@@ -287,9 +308,9 @@ export default function NewSaleScreen() {
                   <TextInput
                     style={[styles.input, { color: colors.foreground }]}
                     value={discountValue}
-                    onChangeText={setDiscountValue}
-                    placeholder="0"
-                    keyboardType="decimal-pad"
+                    onChangeText={(text) => setDiscountValue(discountType === 'percentage' ? text.replace(/[^\d]/g, '') : applyCurrencyMask(text))}
+                    placeholder={discountType === 'percentage' ? '0' : 'R$ 0,00'}
+                    keyboardType="numeric"
                   />
                 </View>
               </View>
@@ -303,7 +324,7 @@ export default function NewSaleScreen() {
                   </View>
                   <View style={styles.discountRow}>
                     <Text style={[styles.discountLabel, { color: colors.muted }]}>
-                      Desconto ({discountType === 'percentage' ? `${discountValue}%` : formatCurrency(parseFloat(discountValue.replace(',', '.')) || 0)})
+                      Desconto ({discountType === 'percentage' ? `${discountValue}%` : discountValue})
                     </Text>
                     <Text style={[styles.discountValue, { color: '#DC2626' }]}>-{formatCurrency(discountAmount)}</Text>
                   </View>
@@ -332,27 +353,29 @@ export default function NewSaleScreen() {
             ))}
           </ScrollView>
 
-          {/* Opção de parcelas para qualquer modalidade de pagamento */}
-          <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
-            <View style={styles.inputRow}>
-              <Text style={[styles.label, { color: colors.muted }]}>Nº de Parcelas</Text>
-              <View style={styles.qtyControl}>
-                <Pressable onPress={() => setInstallmentsCount(Math.max(1, installmentsCount - 1))} style={styles.qtyBtn}>
-                  <MaterialIcons name="remove" size={16} color={colors.primary} />
-                </Pressable>
-                <Text style={[styles.qtyText, { color: colors.foreground }]}>{installmentsCount}x</Text>
-                <Pressable onPress={() => setInstallmentsCount(Math.min(60, installmentsCount + 1))} style={styles.qtyBtn}>
-                  <MaterialIcons name="add" size={16} color={colors.primary} />
-                </Pressable>
-              </View>
-            </View>
-            {totalAmount > 0 && installmentsCount > 1 && (
+          {/* Opção de parcelas apenas para não-crédito */}
+          {paymentType !== 'credit_card' && (
+            <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
               <View style={styles.inputRow}>
-                <Text style={[styles.label, { color: colors.muted }]}>Valor por Parcela</Text>
-                <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>{formatCurrency(totalAmount / installmentsCount)}</Text>
+                <Text style={[styles.label, { color: colors.muted }]}>Nº de Parcelas</Text>
+                <View style={styles.qtyControl}>
+                  <Pressable onPress={() => setInstallmentsCount(Math.max(1, installmentsCount - 1))} style={styles.qtyBtn}>
+                    <MaterialIcons name="remove" size={16} color={colors.primary} />
+                  </Pressable>
+                  <Text style={[styles.qtyText, { color: colors.foreground }]}>{installmentsCount}x</Text>
+                  <Pressable onPress={() => setInstallmentsCount(Math.min(60, installmentsCount + 1))} style={styles.qtyBtn}>
+                    <MaterialIcons name="add" size={16} color={colors.primary} />
+                  </Pressable>
+                </View>
               </View>
-            )}
-          </View>
+              {totalAmount > 0 && installmentsCount > 1 && (
+                <View style={styles.inputRow}>
+                  <Text style={[styles.label, { color: colors.muted }]}>Valor por Parcela</Text>
+                  <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>{formatCurrency(totalAmount / installmentsCount)}</Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Tags */}

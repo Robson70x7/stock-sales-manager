@@ -48,10 +48,8 @@ export function getPaymentTypeLabel(type: PaymentType): string {
   const labels: Record<PaymentType, string> = {
     cash: 'Dinheiro',
     pix: 'PIX',
-    credit_card: 'Cartão de Crédito',
-    debit_card: 'Cartão de Débito',
-    bank_transfer: 'Transferência',
-    installment: 'Parcelado',
+    credit_card: 'Crédito',
+    debit_card: 'Débito',
   };
   return labels[type] || type;
 }

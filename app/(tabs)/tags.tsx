@@ -7,6 +7,7 @@ import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { FAB } from '@/components/ui/FAB';
 import { TAG_COLORS } from '@/lib/utils';
 
 export default function TagsScreen() {
@@ -67,13 +68,6 @@ export default function TagsScreen() {
     <ScreenContainer containerClassName="bg-background">
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <Text style={[styles.title, { color: colors.foreground }]}>Tags</Text>
-        <Pressable
-          onPress={openNew}
-          style={({ pressed }) => [styles.addBtn, { backgroundColor: colors.primary }, pressed && { opacity: 0.8 }]}
-        >
-          <MaterialIcons name="add" size={20} color="#fff" />
-          <Text style={styles.addBtnText}>Nova Tag</Text>
-        </Pressable>
       </View>
 
       <View style={[styles.searchBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -208,6 +202,8 @@ export default function TagsScreen() {
         onConfirm={handleDelete}
         onCancel={() => setDeleteId(null)}
       />
+
+      <FAB onPress={openNew} />
     </ScreenContainer>
   );
 }
@@ -218,11 +214,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 10,
     borderBottomWidth: 0.5,
   },
   title: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: '700',
   },
   addBtn: {

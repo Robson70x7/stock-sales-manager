@@ -55,6 +55,8 @@ ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 # ============================================================
 RUN npm install -g pnpm
 
+RUN pnpm config set store-dir ~/.pnpm-store
+
 # ============================================================
 # Criar diretório de trabalho
 # ============================================================

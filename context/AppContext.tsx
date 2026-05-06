@@ -125,7 +125,7 @@ interface AppContextType extends AppState {
   updateClient: (client: Client) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
   // Sales
-  addSale: (sale: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Sale>;
+  addSale: (sale: Omit<Sale, 'createdAt' | 'updatedAt'>) => Promise<Sale>;
   updateSale: (sale: Sale) => Promise<void>;
   deleteSale: (id: string, returnStock?: boolean) => Promise<void>;
   updateInstallment: (saleId: string, installment: Installment) => Promise<void>;
@@ -416,21 +416,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ---- Sales ----
   const addSale = useCallback(async (
-    saleData: Omit<Sale, 'id' | 'createdAt' | 'updatedAt' | 'items' | 'installments'>
+    saleData: Omit<Sale, 'createdAt' | 'updatedAt'>
   ): Promise<Sale> => {
     const now = new Date().toISOString();
-    const id = generateId();
+    
+    // CORREÇÃO: Não sobrescrever items e installments de saleData
     const sale: Sale = {
       ...saleData,
-      id,
-      items: [],
-      installments: [],
       createdAt: now,
       updatedAt: now,
     };
 
-    dispatch({ type: 'ADD_SALE', payload: sale });
-    await db.saveSale(toDbSale(sale));
+    try{
+      console.log("Salvando venda:", { id: sale.id, totalAmount: sale.totalAmount, itemsCount: sale.items.length, installmentsCount: sale.installments.length });
+      
+      dispatch({ type: 'ADD_SALE', payload: sale });
+      await db.saveSale(toDbSale(sale));
+
+      console.log("Venda salva no DB com sucesso");
+    }catch (e) {
+      console.error("ERRO AO ADICIONAR VENDA:", e);
+      throw e;
+    }
+
+    try{
+      // // CORREÇÃO: Atualizar saleId das parcelas para o novo ID
+      // sale.installments = sale.installments.map(inst => ({
+      //   ...inst,
+      //   saleId: sale.id,
+      // }));
+      
+      console.log("Salvando itens:", { count: sale.items.length, saleId: sale.id });
+      // Salvar items
+      for (const item of sale.items) {
+        await db.saveSaleItem(toDbSaleItem(item, sale.id));
+      }
+      console.log("Itens salvos com sucesso");
+    }catch(e){
+      console.error("ERRO AO SALVAR ITENS DA VENDA:", e);
+      throw e;
+    }
+
+    try{
+      console.log("Salvando parcelas:", { count: sale.installments.length, saleId: sale.id });
+      // Salvar installments (já com saleId correto)
+      for (const inst of sale.installments) {
+        await db.saveInstallment(toDbInstallment(inst));
+      }
+      console.log("Parcelas salvas com sucesso");
+    }catch(e){
+      console.error("ERRO AO SALVAR PARCELAS DA VENDA:", e);
+      throw e;
+    }
+
     return sale;
   }, []);
 

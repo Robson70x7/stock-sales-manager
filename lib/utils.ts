@@ -14,6 +14,29 @@ export function formatCurrency(value: number): string {
   }).format(value);
 }
 
+// Aplica máscara de moeda BRL em string
+export function applyCurrencyMask(value: string): string {
+  // Remove tudo que não for dígito
+  const digits = value.replace(/\D/g, '');
+  
+  if (digits.length === 0) return '';
+  
+  // Converte para número (últimos 2 dígitos são centavos)
+  const number = parseInt(digits, 10) / 100;
+  
+  // Formata com separadores brasileiros
+  return number.toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+}
+
+// Remove máscara e retorna valor numérico
+export function unmaskCurrency(value: string): number {
+  const cleaned = value.replace(/[R$\s.]/g, '').replace(',', '.');
+  return parseFloat(cleaned) || 0;
+}
+
 // Formata data para exibição
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -48,10 +71,8 @@ export function getPaymentTypeLabel(type: PaymentType): string {
   const labels: Record<PaymentType, string> = {
     cash: 'Dinheiro',
     pix: 'PIX',
-    credit_card: 'Cartão de Crédito',
-    debit_card: 'Cartão de Débito',
-    bank_transfer: 'Transferência',
-    installment: 'Parcelado',
+    credit_card: 'Crédito',
+    debit_card: 'Débito',
   };
   return labels[type] || type;
 }
