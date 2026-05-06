@@ -4,10 +4,11 @@ import * as Auth from "@/lib/_core/auth";
 import * as Linking from "expo-linking";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Text } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ActivityIndicator, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function OAuthCallback() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{
     code?: string;
@@ -235,7 +236,7 @@ export default function OAuthCallback() {
   }, [params.code, params.state, params.error, params.sessionToken, params.user, router]);
 
   return (
-    <SafeAreaView className="flex-1" edges={["top", "bottom", "left", "right"]}>
+    <View className="flex-1" style={{ paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }}>
       <ThemedView className="flex-1 items-center justify-center gap-4 p-5">
         {status === "processing" && (
           <>
@@ -266,6 +267,6 @@ export default function OAuthCallback() {
           </>
         )}
       </ThemedView>
-    </SafeAreaView>
+    </View>
   );
 }

@@ -1,5 +1,5 @@
 import { View, type ViewProps } from "react-native";
-import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { useSafeAreaInsets, type Edge } from "react-native-safe-area-context";
 
 import { cn } from "@/lib/utils";
 
@@ -27,7 +27,7 @@ export interface ScreenContainerProps extends ViewProps {
  * A container component that properly handles SafeArea and background colors.
  *
  * The outer View extends to full screen (including status bar area) with the background color,
- * while the inner SafeAreaView ensures content is within safe bounds.
+ * while the inner View ensures content is within safe bounds.
  *
  * Usage:
  * ```tsx
@@ -47,6 +47,20 @@ export function ScreenContainer({
   style,
   ...props
 }: ScreenContainerProps) {
+  const insets = useSafeAreaInsets();
+
+  const getEdgeStyle = (edge: Edge) => {
+    switch (edge) {
+      case "top": return { paddingTop: insets.top };
+      case "bottom": return { paddingBottom: insets.bottom };
+      case "left": return { paddingLeft: insets.left };
+      case "right": return { paddingRight: insets.right };
+      default: return {};
+    }
+  };
+
+  const edgeStyle = edges.reduce((acc, edge) => ({ ...acc, ...getEdgeStyle(edge) }), {});
+
   return (
     <View
       className={cn(
@@ -56,13 +70,12 @@ export function ScreenContainer({
       )}
       {...props}
     >
-      <SafeAreaView
-        edges={edges}
+      <View
         className={cn("flex-1", safeAreaClassName)}
-        style={style}
+        style={[style, edgeStyle]}
       >
         <View className={cn("flex-1", className)}>{children}</View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
