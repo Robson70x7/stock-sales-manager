@@ -7,3 +7,5 @@ export const migrations: { version: number; name: string }[] = [
     "name": "initial"
   }
 ];
+
+export const LATEST_VERSION = 1;

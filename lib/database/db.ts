@@ -1,4 +1,5 @@
 import * as SQLite from 'expo-sqlite';
+import { migrations, LATEST_VERSION } from './schema';
 
 // ============================================================
 // Banco de Dados
@@ -11,6 +12,42 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
     db = await SQLite.openDatabaseAsync('stock_sales.db');
   }
   return db;
+}
+
+// ============================================================
+// Migrations
+// ============================================================
+
+export async function migrateDbIfNeeded(db: SQLite.SQLiteDatabase): Promise<void> {
+  try {
+    const tableCheck = await db.getFirstAsync<{ name: string }>(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name='db_version'"
+    );
+
+    let currentVersion = 0;
+    if (tableCheck) {
+      const result = await db.getFirstAsync<{ version: number }>(
+        'SELECT COALESCE(MAX(version), 0) as version FROM db_version'
+      );
+      currentVersion = result?.version ?? 0;
+    }
+
+    if (currentVersion >= LATEST_VERSION) {
+      return;
+    }
+
+    for (const migration of migrations) {
+      if (migration.version > currentVersion) {
+        await db.execAsync(migration.sql);
+        await db.runAsync(
+          'INSERT INTO db_version (version, appliedAt) VALUES (?, ?)',
+          [migration.version, new Date().toISOString()]
+        );
+      }
+    }
+  } catch (error) {
+    console.error('[Database] Erro ao executar migrations:', error);
+  }
 }
 
 // ============================================================

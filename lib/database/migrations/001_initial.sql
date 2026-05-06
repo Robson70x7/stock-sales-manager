@@ -95,6 +95,3 @@ CREATE TABLE IF NOT EXISTS settings (
     key TEXT PRIMARY KEY NOT NULL,
     value TEXT
 );
-
--- Inserir versão inicial
-INSERT INTO db_version (version, appliedAt) VALUES (1, datetime('now'));

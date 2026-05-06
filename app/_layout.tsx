@@ -15,6 +15,8 @@ import {
   initialWindowMetrics,
 } from "react-native-safe-area-context";
 import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
+import { SQLiteProvider } from "expo-sqlite";
+import { migrateDbIfNeeded } from "@/lib/database/db";
 
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 
@@ -92,7 +94,9 @@ export default function RootLayout() {
         <SafeAreaProvider initialMetrics={providerInitialMetrics}>
           <SafeAreaFrameContext.Provider value={frame}>
             <SafeAreaInsetsContext.Provider value={insets}>
-              {content}
+              <SQLiteProvider databaseName="stock_sales.db" onInit={migrateDbIfNeeded}>
+                {content}
+              </SQLiteProvider>
             </SafeAreaInsetsContext.Provider>
           </SafeAreaFrameContext.Provider>
         </SafeAreaProvider>
@@ -102,7 +106,11 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-      <SafeAreaProvider initialMetrics={providerInitialMetrics}>{content}</SafeAreaProvider>
+      <SafeAreaProvider initialMetrics={providerInitialMetrics}>
+        <SQLiteProvider databaseName="stock_sales.db" onInit={migrateDbIfNeeded}>
+          {content}
+        </SQLiteProvider>
+      </SafeAreaProvider>
     </ThemeProvider>
   );
 }
