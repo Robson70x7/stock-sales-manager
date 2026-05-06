@@ -31,8 +31,19 @@ fi
 
 # Build Desktop (Electron)
 echo -e "\n${YELLOW}[2/2] Compilando versão Desktop (Electron)...${NC}"
+
+# Procurar pasta desktop em locais comuns
+DESKTOP_PATH=""
 if [ -d "../stock-sales-manager-desktop" ]; then
-  cd ../stock-sales-manager-desktop
+  DESKTOP_PATH="../stock-sales-manager-desktop"
+elif [ -d "./stock-sales-manager-desktop" ]; then
+  DESKTOP_PATH="./stock-sales-manager-desktop"
+elif [ -d "../../../stock-sales-manager-desktop" ]; then
+  DESKTOP_PATH="../../../stock-sales-manager-desktop"
+fi
+
+if [ -n "$DESKTOP_PATH" ]; then
+  cd "$DESKTOP_PATH"
   
   echo "Instalando dependências..."
   npm install --legacy-peer-deps || pnpm install
@@ -52,7 +63,10 @@ if [ -d "../stock-sales-manager-desktop" ]; then
   cd ../stock-sales-manager
   echo -e "${GREEN}✓ Desktop build concluído${NC}"
 else
-  echo -e "${RED}✗ Erro: Diretório desktop não encontrado${NC}"
+  echo -e "${RED}✗ Erro: Diretório desktop não encontrado em:${NC}"
+  echo -e "  - ../stock-sales-manager-desktop"
+  echo -e "  - ./stock-sales-manager-desktop"
+  echo -e "  - ../../../stock-sales-manager-desktop"
   exit 1
 fi
 

@@ -37,13 +37,22 @@ if (Test-Path ".") {
     Write-Host "✗ Erro: Diretório mobile não encontrado" -ForegroundColor $Red
     exit 1
 }
-
 # Build Desktop (Electron)
 Write-Host ""
 Write-Host "[2/2] Compilando versão Desktop (Electron)..." -ForegroundColor $Yellow
-if (Test-Path "..\stock-sales-manager-desktop") {
-    Push-Location "..\stock-sales-manager-desktop"
-    
+
+# Procurar pasta desktop em locais comuns
+$desktopPath = $null
+if (Test-Path "../stock-sales-manager-desktop") {
+    $desktopPath = "../stock-sales-manager-desktop"
+} elseif (Test-Path "./stock-sales-manager-desktop") {
+    $desktopPath = "./stock-sales-manager-desktop"
+} elseif (Test-Path "../../../stock-sales-manager-desktop") {
+    $desktopPath = "../../../stock-sales-manager-desktop"
+}
+
+if ($desktopPath) {
+    Push-Location $desktopPath    
     Write-Host "Instalando dependências..."
     npm install --legacy-peer-deps
     if ($LASTEXITCODE -ne 0) {
