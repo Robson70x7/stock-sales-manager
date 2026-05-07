@@ -57,16 +57,12 @@ export default function EditSaleScreen() {
       // Regerar parcelas se necessário (apenas para não-crédito com múltiplas parcelas)
       let installments = sale.installments;
       if (!isCredit && installmentsCount > 1) {
-        installments = generateInstallments(sale.id, totalAmount, installmentsCount, firstInstallmentDate);
+        installments = generateInstallments(totalAmount, installmentsCount, firstInstallmentDate);
       } else if (isCredit) {
         // Para crédito: uma parcela paga
+        const installment = generateInstallments(totalAmount, 1, firstInstallmentDate)[0];
         installments = [{
-          id: sale.installments[0]?.id || Date.now().toString(36) + 'i',
-          saleId: sale.id,
-          number: 1,
-          totalInstallments: 1,
-          amount: totalAmount,
-          dueDate: firstInstallmentDate,
+          ...installment,
           status: 'paid' as const,
           paidDate: new Date().toISOString(),
           history: [{

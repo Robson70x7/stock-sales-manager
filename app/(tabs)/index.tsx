@@ -98,7 +98,7 @@ export default function HomeScreen() {
               clientName: sale.clientName,
               amount: inst.amount,
               dueDate: inst.dueDate,
-              paidDate: inst.paidDate,
+              paidDate: inst.paidDate ?? undefined,
               status: inst.status,
               paymentType: sale.paymentType,
               tagIds: sale.tagIds,

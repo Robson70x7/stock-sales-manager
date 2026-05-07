@@ -7,17 +7,16 @@ describe('Bug Scenario: Sale disappears when switching months', () => {
     // - Created sale in April 2026
     // - 3 installments starting from 20/04/2026
     // - Expected: Sale appears in April, May, and June
-
-    const saleId = 'sale-123';
+    
     const totalAmount = 300;
     const count = 3;
     const startDate = '2026-04-20'; // User selected date from picker
-
+    
     // Simulate what happens in handleSave
     const firstInstallmentDateISO = new Date(startDate).toISOString();
     console.log('firstInstallmentDate (ISO):', firstInstallmentDateISO);
 
-    const installments = generateInstallments(saleId, totalAmount, count, firstInstallmentDateISO);
+    const installments = generateInstallments(totalAmount, count, firstInstallmentDateISO);
 
     console.log('\nGenerated installments:');
     installments.forEach((inst, idx) => {
@@ -58,7 +57,7 @@ describe('Bug Scenario: Sale disappears when switching months', () => {
   it('should verify installments array is not empty', () => {
     const startDate = '2026-04-20';
     const firstInstallmentDateISO = new Date(startDate).toISOString();
-    const installments = generateInstallments('sale-123', 300, 3, firstInstallmentDateISO);
+    const installments = generateInstallments(300, 3, firstInstallmentDateISO);
 
     expect(installments).toHaveLength(3);
     expect(installments[0]).toBeDefined();

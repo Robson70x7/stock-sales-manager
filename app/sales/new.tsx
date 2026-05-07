@@ -102,12 +102,11 @@ export default function NewSaleScreen() {
   };
 
   const handleSave = async () => {
-    if (totalAmount <= 0) { Alert.alert('Atenção', 'Informe o valor da venda.'); return; }
+    if (totalAmount <=0) { Alert.alert('Atenção', 'Informe o valor da venda.'); return; }
 
     setSaving(true);
     try {
-      const saleId = Date.now().toString(36);
-      console.log('Iniciando salvamento da venda:', { saleId, totalAmount, itemsCount: items.length, paymentType });
+      console.log('Iniciando salvamento da venda:', { totalAmount, itemsCount: items.length, paymentType });
 
       // Para crédito: pagamento único e já pago
       const isCredit = paymentType === 'credit_card';
@@ -115,16 +114,11 @@ export default function NewSaleScreen() {
       const saleStatus = isCredit ? 'paid' as const : 'pending' as const;
 
       const installments = count > 1 && !isCredit
-        ? generateInstallments(saleId, totalAmount, count, firstInstallmentDate)
+        ? generateInstallments(totalAmount, count, firstInstallmentDate)
         : [{
-            id: Date.now().toString(36) + 'i',
-            saleId,
-            number: 1,
-            totalInstallments: 1,
-            amount: totalAmount,
-            dueDate: firstInstallmentDate,
+            ...generateInstallments(totalAmount, 1, firstInstallmentDate)[0],
             status: isCredit ? 'paid' as const : 'pending' as const,
-            paidDate: isCredit ? new Date().toISOString() : undefined,
+            paidDate: isCredit ? new Date().toISOString() : null,
             history: [{
               date: new Date().toISOString(),
               status: isCredit ? 'paid' as const : 'pending' as const,
@@ -135,7 +129,6 @@ export default function NewSaleScreen() {
       console.log('Chamando addSale com:', { itemsCount: items.length, installmentsCount: installments.length });
       
       await addSale({
-        id: saleId,
         description: description.trim() || undefined,
         clientId: selectedClientId,
         clientName: selectedClient?.name,
@@ -157,7 +150,9 @@ export default function NewSaleScreen() {
       router.back();
     } catch (e) {
       console.error('Erro ao salvar venda:', e);
-      Alert.alert('Erro', `Não foi possível salvar a venda: ${e instanceof Error ? e.message : 'Erro desconhecido'}`);
+      const errorMessage = e instanceof Error ? e.message : 'Erro desconhecido';
+      console.error('Detalhes do erro:', errorMessage);
+      Alert.alert('Erro', `Não foi possível salvar a venda: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
@@ -429,7 +424,7 @@ export default function NewSaleScreen() {
           <View style={[styles.pickerSheet, { backgroundColor: colors.surface }]}>
             <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Adicionar Produto</Text>
             <FlatList
-              data={state.products}
+              data={state.products.filter(p => p.stock > 1)}
               keyExtractor={p => p.id}
               renderItem={({ item }) => (
                 <Pressable

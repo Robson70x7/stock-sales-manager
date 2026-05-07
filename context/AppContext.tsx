@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useReducer, useCallback } from 'react';
 import { Tag, Product, Client, Sale, SaleItem, Installment, AppSettings } from '@/types';
 import * as db from '@/lib/database/db';
+import { generateId } from '@/lib/utils';
 
 // ============================================================
 // Estado global
@@ -125,7 +126,7 @@ interface AppContextType extends AppState {
   updateClient: (client: Client) => Promise<void>;
   deleteClient: (id: string) => Promise<void>;
   // Sales
-  addSale: (sale: Omit<Sale, 'createdAt' | 'updatedAt'>) => Promise<Sale>;
+  addSale: (sale: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>) => Promise<Sale>;
   updateSale: (sale: Sale) => Promise<void>;
   deleteSale: (id: string, returnStock?: boolean) => Promise<void>;
   updateInstallment: (saleId: string, installment: Installment) => Promise<void>;
@@ -135,16 +136,12 @@ interface AppContextType extends AppState {
 
 const AppContext = createContext<AppContextType | null>(null);
 
-function generateId(): string {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-}
-
 function toDbTag(tag: Tag): db.DbTag {
   return {
     id: tag.id,
     name: tag.name,
     color: tag.color,
-    createdAt: new Date(tag.createdAt).getTime(),
+    createdAt: tag.createdAt,
   };
 }
 
@@ -153,7 +150,7 @@ function fromDbTag(row: db.DbTag): Tag {
     id: row.id,
     name: row.name,
     color: row.color,
-    createdAt: new Date(row.createdAt).toISOString(),
+    createdAt: row.createdAt,
   };
 }
 
@@ -168,8 +165,8 @@ function toDbProduct(product: Product): db.DbProduct {
     stock: product.stock,
     unit: product.unit || null,
     photoUri: product.photoUri || null,
-    createdAt: new Date(product.createdAt).getTime(),
-    updatedAt: new Date(product.updatedAt).getTime(),
+    createdAt: product.createdAt,
+    updatedAt: product.updatedAt,
   };
 }
 
@@ -184,8 +181,8 @@ function fromDbProduct(row: db.DbProduct): Product {
     stock: row.stock,
     unit: row.unit || undefined,
     photoUri: row.photoUri || undefined,
-    createdAt: new Date(row.createdAt).toISOString(),
-    updatedAt: new Date(row.updatedAt).toISOString(),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -198,8 +195,8 @@ function toDbClient(client: Client): db.DbClient {
     email: client.email || null,
     address: client.address || null,
     notes: client.notes || null,
-    createdAt: new Date(client.createdAt).getTime(),
-    updatedAt: new Date(client.updatedAt).getTime(),
+    createdAt: client.createdAt,
+    updatedAt: client.updatedAt,
   };
 }
 
@@ -212,8 +209,8 @@ function fromDbClient(row: db.DbClient): Client {
     email: row.email || undefined,
     address: row.address || undefined,
     notes: row.notes || undefined,
-    createdAt: new Date(row.createdAt).toISOString(),
-    updatedAt: new Date(row.updatedAt).toISOString(),
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   };
 }
 
@@ -230,51 +227,51 @@ function toDbSale(sale: Sale): db.DbSale {
     discountValue: sale.discountValue,
     totalAmount: sale.totalAmount,
     status: sale.status,
-    saleDate: new Date(sale.saleDate).getTime(),
-    firstInstallmentDate: sale.firstInstallmentDate ? new Date(sale.firstInstallmentDate).getTime() : null,
+    saleDate: sale.saleDate,
+    firstInstallmentDate: sale.firstInstallmentDate || null,
     tagIds: JSON.stringify(sale.tagIds),
-    createdAt: new Date(sale.createdAt).getTime(),
-    updatedAt: new Date(sale.updatedAt).getTime(),
+    createdAt: sale.createdAt,
+    updatedAt: sale.updatedAt,
   };
 }
 
 function fromDbSale(row: db.DbSale, items: db.DbSaleItem[], installments: db.DbInstallment[]): Sale {
-  return {
-    id: row.id,
-    description: row.description || undefined,
-    clientId: row.clientId || undefined,
-    clientName: row.clientName || undefined,
-    items: items.map(i => ({
-      productId: i.productId,
-      productName: i.productName,
-      quantity: i.quantity,
-      unitPrice: i.unitPrice,
-      totalPrice: i.totalPrice,
-    })),
-    subtotal: row.subtotal,
-    discountType: row.discountType as Sale['discountType'] || null,
-    discountValue: row.discountValue,
-    totalAmount: row.totalAmount,
-    paymentType: row.paymentType as Sale['paymentType'],
-    status: row.status as Sale['status'],
-    installmentsCount: row.installmentsCount,
-    installments: installments.map(inst => ({
-      id: inst.id,
-      saleId: inst.saleId,
-      number: inst.number,
-      totalInstallments: inst.totalInstallments,
-      amount: inst.amount,
-      dueDate: new Date(inst.dueDate).toISOString(),
-      paidDate: inst.paidDate ? new Date(inst.paidDate).toISOString() : undefined,
-      status: inst.status as Installment['status'],
-      history: JSON.parse(inst.history || '[]'),
-    })),
-    tagIds: JSON.parse(row.tagIds || '[]'),
-    saleDate: new Date(row.saleDate).toISOString(),
-    firstInstallmentDate: row.firstInstallmentDate ? new Date(row.firstInstallmentDate).toISOString() : undefined,
-    createdAt: new Date(row.createdAt).toISOString(),
-    updatedAt: new Date(row.updatedAt).toISOString(),
-  };
+      return {
+        id: row.id,
+        description: row.description || undefined,
+        clientId: row.clientId || undefined,
+        clientName: row.clientName || undefined,
+        items: items.map(i => ({
+          productId: i.productId,
+          productName: i.productName,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          totalPrice: i.totalPrice,
+        })),
+        subtotal: row.subtotal,
+        discountType: row.discountType as Sale['discountType'] || null,
+        discountValue: row.discountValue,
+        totalAmount: row.totalAmount,
+        paymentType: row.paymentType as Sale['paymentType'],
+        status: row.status as Sale['status'],
+        installmentsCount: row.installmentsCount,
+        installments: installments.map(inst => ({
+          id: inst.id,
+          saleId: inst.saleId,
+          number: inst.number,
+          totalInstallments: inst.totalInstallments,
+          amount: inst.amount,
+          dueDate: inst.dueDate,
+          paidDate: inst.paidDate || undefined,
+          status: inst.status as Installment['status'],
+          history: JSON.parse(inst.history || '[]'),
+        })),
+        tagIds: JSON.parse(row.tagIds || '[]'),
+        saleDate: row.saleDate,
+        firstInstallmentDate: row.firstInstallmentDate || undefined,
+        createdAt: row.createdAt,
+        updatedAt: row.updatedAt,
+      };
 }
 
 function toDbSaleItem(item: SaleItem, saleId: string): db.DbSaleItem {
@@ -296,8 +293,8 @@ function toDbInstallment(inst: Installment): db.DbInstallment {
     number: inst.number,
     totalInstallments: inst.totalInstallments,
     amount: inst.amount,
-    dueDate: new Date(inst.dueDate).getTime(),
-    paidDate: inst.paidDate ? new Date(inst.paidDate).getTime() : null,
+    dueDate: inst.dueDate,
+    paidDate: inst.paidDate || null,
     status: inst.status,
     history: JSON.stringify(inst.history),
   };
@@ -416,38 +413,81 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // ---- Sales ----
   const addSale = useCallback(async (
-    saleData: Omit<Sale, 'createdAt' | 'updatedAt'>
+    saleData: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>
   ): Promise<Sale> => {
     const now = new Date().toISOString();
+    const id = generateId();
     
     // CORREÇÃO: Não sobrescrever items e installments de saleData
     const sale: Sale = {
       ...saleData,
+      id,
       createdAt: now,
       updatedAt: now,
     };
 
     try{
       console.log("Salvando venda:", { id: sale.id, totalAmount: sale.totalAmount, itemsCount: sale.items.length, installmentsCount: sale.installments.length });
+      console.log("Sale data for DB:", JSON.stringify(toDbSale(sale), null, 2));
       
-      dispatch({ type: 'ADD_SALE', payload: sale });
       await db.saveSale(toDbSale(sale));
-
       console.log("Venda salva no DB com sucesso");
     }catch (e) {
-      console.error("ERRO AO ADICIONAR VENDA:", e);
+      console.error("ERRO AO SALVAR VENDA:", e);
+      console.error("Sale object:", JSON.stringify(sale, null, 2));
       throw e;
     }
 
     try{
-      // // CORREÇÃO: Atualizar saleId das parcelas para o novo ID
-      // sale.installments = sale.installments.map(inst => ({
-      //   ...inst,
-      //   saleId: sale.id,
-      // }));
-      
       console.log("Salvando itens:", { count: sale.items.length, saleId: sale.id });
-      // Salvar items
+      // Atualizar saleId dos itens para o novo ID
+      sale.items = sale.items.map(item => ({
+        ...item,
+        saleId: sale.id,
+      }));
+      
+      // Salvar itens
+      for (const item of sale.items) {
+        console.log("Saving item:", JSON.stringify(toDbSaleItem(item, sale.id), null, 2));
+        await db.saveSaleItem(toDbSaleItem(item, sale.id));
+      }
+      console.log("Itens salvos com sucesso");
+    }catch(e){
+      console.error("ERRO AO SALVAR ITENS DA VENDA:", e);
+      console.error("Items:", JSON.stringify(sale.items, null, 2));
+      throw e;
+    }
+
+    try{
+      console.log("Salvando parcelas:", { count: sale.installments.length, saleId: sale.id });
+      // Atualizar saleId das parcelas para o novo ID
+      sale.installments = sale.installments.map(inst => ({
+        ...inst,
+        saleId: sale.id,
+      }));
+      // Salvar installments (já com saleId correto)
+      for (const inst of sale.installments) {
+        console.log("Saving installment:", JSON.stringify(toDbInstallment(inst), null, 2));
+        await db.saveInstallment(toDbInstallment(inst));
+      }
+      console.log("Parcelas salvas com sucesso");
+    }catch(e){
+      console.error("ERRO AO SALVAR PARCELAS DA VENDA:", e);
+      console.error("Installments:", JSON.stringify(sale.installments, null, 2));
+      throw e;
+    }
+
+    try{
+      console.log("Salvando itens:", { count: sale.items.length, saleId: sale.id });
+
+      // Atualizar saleId dos itens para o novo ID
+      sale.items = sale.items.map(item => ({
+        ...item,
+        saleId: sale.id,
+      }));
+      
+
+      // Salvar itens
       for (const item of sale.items) {
         await db.saveSaleItem(toDbSaleItem(item, sale.id));
       }
@@ -459,6 +499,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     try{
       console.log("Salvando parcelas:", { count: sale.installments.length, saleId: sale.id });
+      // Atualizar saleId das parcelas para o novo ID
+      sale.installments = sale.installments.map(inst => ({
+        ...inst,
+        saleId: sale.id,
+      }));
       // Salvar installments (já com saleId correto)
       for (const inst of sale.installments) {
         await db.saveInstallment(toDbInstallment(inst));
@@ -469,6 +514,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       throw e;
     }
 
+    // Só atualiza o estado local após salvar tudo com sucesso
+    dispatch({ type: 'ADD_SALE', payload: sale });
     return sale;
   }, []);
 

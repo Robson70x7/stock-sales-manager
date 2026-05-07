@@ -1,6 +1,11 @@
 import * as SQLite from 'expo-sqlite';
 import { migrations, LATEST_VERSION } from './schema';
 
+// Sanitiza parâmetros para expo-sqlite (Android rejeita undefined)
+function sanitizeParams(params: any[]): any[] {
+  return params.map(p => p === undefined ? null : p);
+}
+
 // ============================================================
 // Banco de Dados
 // ============================================================
@@ -57,7 +62,7 @@ export interface DbTag {
   id: string;
   name: string;
   color: string;
-  createdAt: number;
+  createdAt: string;
 }
 
 export async function getTags(): Promise<DbTag[]> {
@@ -78,13 +83,13 @@ export async function saveTag(tag: DbTag): Promise<DbTag> {
   if (existing) {
     await database.runAsync(
       'UPDATE tags SET name = ?, color = ? WHERE id = ?',
-      [tag.name, tag.color, tag.id]
+      sanitizeParams([tag.name, tag.color, tag.id])
     );
     return tag;
   }
   await database.runAsync(
     'INSERT INTO tags (id, name, color, createdAt) VALUES (?, ?, ?, ?)',
-    [tag.id, tag.name, tag.color, tag.createdAt]
+    sanitizeParams([tag.id, tag.name, tag.color, tag.createdAt])
   );
   return tag;
 }
@@ -107,8 +112,8 @@ export interface DbProduct {
   stock: number;
   unit: string | null;
   photoUri: string | null;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export async function getProducts(): Promise<DbProduct[]> {
@@ -130,16 +135,16 @@ export async function saveProduct(product: DbProduct): Promise<DbProduct> {
     await database.runAsync(
       `UPDATE products SET name = ?, description = ?, category = ?, costPrice = ?, 
        salePrice = ?, stock = ?, unit = ?, photoUri = ?, updatedAt = ? WHERE id = ?`,
-      [product.name, product.description, product.category, product.costPrice,
-       product.salePrice, product.stock, product.unit, product.photoUri, product.updatedAt, product.id]
+      sanitizeParams([product.name, product.description, product.category, product.costPrice,
+       product.salePrice, product.stock, product.unit, product.photoUri, product.updatedAt, product.id])
     );
     return product;
   }
   await database.runAsync(
     `INSERT INTO products (id, name, description, category, costPrice, salePrice, 
      stock, unit, photoUri, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [product.id, product.name, product.description, product.category, product.costPrice,
-     product.salePrice, product.stock, product.unit, product.photoUri, product.createdAt, product.updatedAt]
+    sanitizeParams([product.id, product.name, product.description, product.category, product.costPrice,
+     product.salePrice, product.stock, product.unit, product.photoUri, product.createdAt, product.updatedAt])
   );
   return product;
 }
@@ -153,7 +158,7 @@ export async function updateProductStock(id: string, quantity: number): Promise<
   const database = await getDb();
   await database.runAsync(
     'UPDATE products SET stock = stock + ?, updatedAt = ? WHERE id = ?',
-    [quantity, Date.now(), id]
+    sanitizeParams([quantity, new Date().toISOString(), id])
   );
 }
 
@@ -168,8 +173,8 @@ export interface DbClient {
   email: string | null;
   address: string | null;
   notes: string | null;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export async function getClients(): Promise<DbClient[]> {
@@ -191,16 +196,16 @@ export async function saveClient(client: DbClient): Promise<DbClient> {
     await database.runAsync(
       `UPDATE clients SET name = ?, document = ?, phone = ?, email = ?, 
        address = ?, notes = ?, updatedAt = ? WHERE id = ?`,
-      [client.name, client.document, client.phone, client.email,
-       client.address, client.notes, client.updatedAt, client.id]
+      sanitizeParams([client.name, client.document, client.phone, client.email,
+       client.address, client.notes, client.updatedAt, client.id])
     );
     return client;
   }
   await database.runAsync(
     `INSERT INTO clients (id, name, document, phone, email, address, notes, createdAt, updatedAt) 
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [client.id, client.name, client.document, client.phone, client.email,
-     client.address, client.notes, client.createdAt, client.updatedAt]
+    sanitizeParams([client.id, client.name, client.document, client.phone, client.email,
+     client.address, client.notes, client.createdAt, client.updatedAt])
   );
   return client;
 }
@@ -225,11 +230,11 @@ export interface DbSale {
   discountValue: number;
   totalAmount: number;
   status: string;
-  saleDate: number;
-  firstInstallmentDate: number | null;
+  saleDate: string;
+  firstInstallmentDate: string | null;
   tagIds: string;
-  createdAt: number;
-  updatedAt: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export async function getSales(): Promise<DbSale[]> {
@@ -253,22 +258,22 @@ export async function saveSale(sale: DbSale): Promise<DbSale> {
        installmentsCount = ?, subtotal = ?, discountType = ?, discountValue = ?, 
        totalAmount = ?, status = ?, saleDate = ?, firstInstallmentDate = ?, 
        tagIds = ?, updatedAt = ? WHERE id = ?`,
-      [sale.description, sale.clientId, sale.clientName, sale.paymentType,
+      sanitizeParams([sale.description, sale.clientId, sale.clientName, sale.paymentType,
        sale.installmentsCount, sale.subtotal, sale.discountType, sale.discountValue,
        sale.totalAmount, sale.status, sale.saleDate, sale.firstInstallmentDate,
-       sale.tagIds, sale.updatedAt, sale.id]
+       sale.tagIds, sale.updatedAt, sale.id])
     );
     return sale;
   }
   await database.runAsync(
     `INSERT INTO sales (id, description, clientId, clientName, paymentType, installmentsCount, 
      subtotal, discountType, discountValue, totalAmount, status, saleDate, firstInstallmentDate, 
-     tagIds, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [sale.id, sale.description, sale.clientId, sale.clientName, sale.paymentType,
+     tagIds, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    sanitizeParams([sale.id, sale.description, sale.clientId, sale.clientName, sale.paymentType,
      sale.installmentsCount, sale.subtotal, sale.discountType, sale.discountValue,
      sale.totalAmount, sale.status, sale.saleDate, sale.firstInstallmentDate,
-     sale.tagIds, sale.createdAt, sale.updatedAt]
-  );
+     sale.tagIds, sale.createdAt, sale.updatedAt])
+  ); 
   return sale;
 }
 
@@ -301,10 +306,11 @@ export async function getSaleItems(saleId: string): Promise<DbSaleItem[]> {
 
 export async function saveSaleItem(item: DbSaleItem): Promise<DbSaleItem> {
   const database = await getDb();
+  await database.runAsync('DELETE FROM sale_items WHERE id = ?', sanitizeParams([item.id]));
   await database.runAsync(
-    `INSERT OR REPLACE INTO sale_items (id, saleId, productId, productName, quantity, unitPrice, totalPrice) 
+    `INSERT INTO sale_items (id, saleId, productId, productName, quantity, unitPrice, totalPrice) 
      VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [item.id, item.saleId, item.productId, item.productName, item.quantity, item.unitPrice, item.totalPrice]
+    sanitizeParams([item.id, item.saleId, item.productId, item.productName, item.quantity, item.unitPrice, item.totalPrice])
   );
   return item;
 }
@@ -323,8 +329,8 @@ export interface DbInstallment {
   number: number;
   totalInstallments: number;
   amount: number;
-  dueDate: number;
-  paidDate: number | null;
+  dueDate: string;
+  paidDate: string | null;
   status: string;
   history: string;
 }
@@ -340,11 +346,12 @@ export async function getInstallments(saleId: string): Promise<DbInstallment[]> 
 
 export async function saveInstallment(installment: DbInstallment): Promise<DbInstallment> {
   const database = await getDb();
+  await database.runAsync('DELETE FROM installments WHERE id = ?', sanitizeParams([installment.id]));
   await database.runAsync(
-    `INSERT OR REPLACE INTO installments (id, saleId, number, totalInstallments, amount, 
+    `INSERT INTO installments (id, saleId, number, totalInstallments, amount, 
      dueDate, paidDate, status, history) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [installment.id, installment.saleId, installment.number, installment.totalInstallments,
-     installment.amount, installment.dueDate, installment.paidDate, installment.status, installment.history]
+    sanitizeParams([installment.id, installment.saleId, installment.number, installment.totalInstallments,
+     installment.amount, installment.dueDate, installment.paidDate, installment.status, installment.history])
   );
   return installment;
 }
@@ -375,7 +382,7 @@ export async function saveSetting(key: string, value: string): Promise<void> {
   const database = await getDb();
   await database.runAsync(
     'INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)',
-    [key, value]
+    sanitizeParams([key, value])
   );
 }
 

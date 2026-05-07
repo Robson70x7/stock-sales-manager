@@ -143,33 +143,33 @@ describe('getSaleStatusColor', () => {
 // ============================================================
 describe('generateInstallments', () => {
   it('gera o número correto de parcelas', () => {
-    const installments = generateInstallments('sale1', 300, 3, '2026-01-01');
+    const installments = generateInstallments(300, 3, '2026-01-01');
     expect(installments).toHaveLength(3);
   });
 
   it('cada parcela tem o valor correto', () => {
-    const installments = generateInstallments('sale1', 300, 3, '2026-01-01');
+    const installments = generateInstallments(300, 3, '2026-01-01');
     installments.forEach(inst => {
       expect(inst.amount).toBeCloseTo(100, 1);
     });
   });
 
   it('parcelas têm status pending por padrão', () => {
-    const installments = generateInstallments('sale1', 300, 3, '2026-01-01');
+    const installments = generateInstallments(300, 3, '2026-01-01');
     installments.forEach(inst => {
       expect(inst.status).toBe('pending');
     });
   });
 
-  it('parcelas têm saleId correto', () => {
-    const installments = generateInstallments('sale1', 300, 3, '2026-01-01');
+  it('parcelas têm saleId vazio (preenchido pelo contexto)', () => {
+    const installments = generateInstallments(300, 3, '2026-01-01');
     installments.forEach(inst => {
-      expect(inst.saleId).toBe('sale1');
+      expect(inst.saleId).toBe('');
     });
   });
 
   it('parcelas têm datas de vencimento mensais consecutivas', () => {
-    const installments = generateInstallments('sale1', 300, 3, '2026-04-15');
+    const installments = generateInstallments(300, 3, '2026-04-15');
     const months = installments.map(i => new Date(i.dueDate).getMonth());
     // Verifica que cada parcela é em um mês diferente e consecutivo
     expect(months[1]).toBe(months[0] + 1);
@@ -177,21 +177,21 @@ describe('generateInstallments', () => {
   });
 
   it('parcelas têm numeração correta', () => {
-    const installments = generateInstallments('sale1', 300, 3, '2026-01-01');
+    const installments = generateInstallments(300, 3, '2026-01-01');
     expect(installments[0].number).toBe(1);
     expect(installments[1].number).toBe(2);
     expect(installments[2].number).toBe(3);
   });
 
   it('parcelas têm totalInstallments correto', () => {
-    const installments = generateInstallments('sale1', 300, 3, '2026-01-01');
+    const installments = generateInstallments(300, 3, '2026-01-01');
     installments.forEach(inst => {
       expect(inst.totalInstallments).toBe(3);
     });
   });
 
   it('gera 1 parcela para pagamento à vista', () => {
-    const installments = generateInstallments('sale1', 500, 1, '2026-04-01');
+    const installments = generateInstallments(500, 1, '2026-04-01');
     expect(installments).toHaveLength(1);
     expect(installments[0].amount).toBeCloseTo(500, 1);
   });

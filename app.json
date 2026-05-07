@@ -1,0 +1,9 @@
+{
+  "expo": {
+    "slug": "app-template",
+    "name": "app-template",
+    "sdkVersion": "54.0.0",
+    "entryPoint": ".vscode/exponentIndex.js"
+  },
+  "name": "app-template"
+}

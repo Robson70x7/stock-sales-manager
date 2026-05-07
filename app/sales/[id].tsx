@@ -54,8 +54,18 @@ export default function SaleDetailScreen() {
     const updated: Installment = {
       ...installment,
       status: newStatus,
-      paidDate: newStatus === 'paid' ? new Date().toISOString() : undefined,
+      paidDate: newStatus === 'paid' ? new Date().toISOString() : null,
+      history: [
+        ...(installment.history || []),
+        {
+          date: new Date().toISOString(),
+          status: newStatus,
+          notes: newStatus === 'paid' ? 'Parcela paga' : 'Parcela reaberta',
+        },
+      ],
     };
+    console.log('Iniciando alteração de parcela');
+    console.log(`Dados para alteração`, JSON.stringify(updated,null,2))
     await updateInstallment(sale.id, updated);
   };
 

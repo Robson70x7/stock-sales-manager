@@ -6,12 +6,11 @@ describe('Bug: Installments disappear when switching months', () => {
     // Reproducing the exact scenario:
     // - Sale created in April 2026
     // - 3 installments starting from 20/04/2026
-    const saleId = 'test-sale-bug';
     const totalAmount = 300;
     const count = 3;
     const startDate = '2026-04-20T00:00:00.000Z'; // April 20, 2026
 
-    const installments = generateInstallments(saleId, totalAmount, count, startDate);
+    const installments = generateInstallments(totalAmount, count, startDate);
 
     console.log('Generated installments:');
     installments.forEach((inst, idx) => {

@@ -5,7 +5,11 @@ export const migrations: { version: number; name: string }[] = [
   {
     "version": 1,
     "name": "initial"
+  },
+  {
+    "version": 3,
+    "name": "dates_to_text"
   }
 ];
 
-export const LATEST_VERSION = 1;
+export const LATEST_VERSION = 3;

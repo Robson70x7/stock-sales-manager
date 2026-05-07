@@ -60,7 +60,7 @@ export interface Installment {
   totalInstallments: number;
   amount: number;
   dueDate: string;
-  paidDate?: string;
+  paidDate?: string | null;
   status: InstallmentStatus;
   history: InstallmentHistory[];
 }

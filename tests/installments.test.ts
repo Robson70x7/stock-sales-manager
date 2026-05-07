@@ -3,12 +3,11 @@ import { generateInstallments, isInMonth } from '../lib/utils';
 
 describe('Installments', () => {
   it('should generate installments with correct due dates', () => {
-    const saleId = 'test-sale-1';
     const totalAmount = 300;
     const count = 3;
     const startDate = '2026-04-14T00:00:00.000Z'; // April 14, 2026
 
-    const installments = generateInstallments(saleId, totalAmount, count, startDate);
+    const installments = generateInstallments(totalAmount, count, startDate);
 
     expect(installments).toHaveLength(3);
     expect(installments[0].number).toBe(1);
@@ -52,12 +51,11 @@ describe('Installments', () => {
   });
 
   it('should show installments in their respective months', () => {
-    const saleId = 'test-sale-2';
     const totalAmount = 300;
     const count = 3;
     const startDate = '2026-04-14T00:00:00.000Z';
 
-    const installments = generateInstallments(saleId, totalAmount, count, startDate);
+    const installments = generateInstallments(totalAmount, count, startDate);
 
     // Installment 1 should be in April (month 3)
     expect(isInMonth(installments[0].dueDate, 2026, 3)).toBe(true);
