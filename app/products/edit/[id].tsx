@@ -21,7 +21,6 @@ export default function EditProductScreen() {
   const [description, setDescription] = useState(product?.description || '');
   const [costPrice, setCostPrice] = useState(product?.costPrice?.toString() || '');
   const [salePrice, setSalePrice] = useState(product?.salePrice?.toString() || '');
-  const [stock, setStock] = useState(product?.stock?.toString() || '');
   const [unit, setUnit] = useState(product?.unit || 'un');
   const [photoUri, setPhotoUri] = useState<string | null>(product?.photoUri || null);
   const [saving, setSaving] = useState(false);
@@ -78,7 +77,6 @@ export default function EditProductScreen() {
         description: description.trim() || undefined,
         costPrice: parsePrice(costPrice),
         salePrice: parsePrice(salePrice),
-        stock: parseInt(stock) || 0,
         unit: unit.trim() || 'un',
         photoUri: finalPhotoUri || undefined,
       });
@@ -138,11 +136,6 @@ export default function EditProductScreen() {
             <View style={styles.inputRow}>
               <Text style={[styles.label, { color: colors.muted }]}>Preço de Venda *</Text>
               <TextInput style={[styles.input, { color: colors.foreground }]} value={salePrice} onChangeText={setSalePrice} placeholder="0,00" placeholderTextColor={colors.muted} keyboardType="decimal-pad" />
-            </View>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <View style={styles.inputRow}>
-              <Text style={[styles.label, { color: colors.muted }]}>Estoque</Text>
-              <TextInput style={[styles.input, { color: colors.foreground }]} value={stock} onChangeText={setStock} placeholder="0" placeholderTextColor={colors.muted} keyboardType="number-pad" />
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={styles.inputRow}>

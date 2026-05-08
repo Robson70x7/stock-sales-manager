@@ -9,7 +9,7 @@ import { useColors } from '@/hooks/use-colors';
 import { persistImage } from '@/lib/imageUtils';
 
 export default function NewProductScreen() {
-  const { state, addProduct } = useApp();
+  const { state, addProduct, addStockMovement } = useApp();
   const colors = useColors();
   const router = useRouter();
 
@@ -18,7 +18,7 @@ export default function NewProductScreen() {
   const [description, setDescription] = useState('');
   const [costPrice, setCostPrice] = useState('');
   const [salePrice, setSalePrice] = useState('');
-  const [stock, setStock] = useState('');
+  const [initStock, setInitStock] = useState('');
   const [unit, setUnit] = useState('un');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -68,16 +68,28 @@ export default function NewProductScreen() {
         persistedPhotoUri = await persistImage(photoUri, productId);
       }
       
-      await addProduct({
+      const newProd = await addProduct({
         name: name.trim(),
         category: category.trim() || undefined,
         description: description.trim() || undefined,
         costPrice: parsePrice(costPrice),
         salePrice: parsePrice(salePrice),
-        stock: parseInt(stock) || 0,
+        stock: 0,
         unit: unit.trim() || 'un',
         photoUri: persistedPhotoUri || undefined,
       });
+
+      const initStockValue = parseInt(initStock || '0');
+
+      if(initStockValue > 0){
+        await addStockMovement({
+          productId: newProd.id,
+          quantity: initStockValue,
+          type: 'in',
+          notes: 'Estoque inicial',
+        });
+      }
+
       router.back();
     } catch {
       Alert.alert('Erro', 'Não foi possível salvar o produto.');
@@ -136,11 +148,13 @@ export default function NewProductScreen() {
               <TextInput style={[styles.input, { color: colors.foreground }]} value={salePrice} onChangeText={setSalePrice} placeholder="0,00" placeholderTextColor={colors.muted} keyboardType="decimal-pad" returnKeyType="next" />
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
             <View style={styles.inputRow}>
-              <Text style={[styles.label, { color: colors.muted }]}>Estoque</Text>
-              <TextInput style={[styles.input, { color: colors.foreground }]} value={stock} onChangeText={setStock} placeholder="0" placeholderTextColor={colors.muted} keyboardType="number-pad" returnKeyType="next" />
+              <Text style={[styles.label, { color: colors.muted }]}>Estoque inicial</Text>
+              <TextInput inputMode='numeric' style={[styles.input, { color: colors.foreground }]} value={initStock} onChangeText={setInitStock} keyboardType="numeric" returnKeyType="next" />
             </View>
             <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
             <View style={styles.inputRow}>
               <Text style={[styles.label, { color: colors.muted }]}>Unidade</Text>
               <TextInput style={[styles.input, { color: colors.foreground }]} value={unit} onChangeText={setUnit} placeholder="un, kg, m, L..." placeholderTextColor={colors.muted} returnKeyType="done" />

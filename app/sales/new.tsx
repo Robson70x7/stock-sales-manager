@@ -421,7 +421,7 @@ export default function NewSaleScreen() {
               style={[styles.paymentOption, { borderColor: colors.border, alignSelf: 'flex-start', marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, isPaid && { backgroundColor: colors.primary, borderColor: colors.primary }]}
             >
               <MaterialIcons name={isPaid ? 'check-box' : 'check-box-outline-blank'} size={20} color={isPaid ? '#fff' : colors.muted} />
-              <Text style={[styles.paymentText, { color: isPaid ? '#fff' : colors.foreground }]}>Venda já paga</Text>
+              <Text style={[styles.paymentText, { color: isPaid ? '#fff' : colors.foreground }]}>Marcar como pago</Text>
             </Pressable>
           )}
         </View>
@@ -472,7 +472,7 @@ export default function NewSaleScreen() {
                   {item.phone && <Text style={[styles.pickerItemSub, { color: colors.muted }]}>{item.phone}</Text>}
                 </Pressable>
               )}
-              style={{ maxHeight: 300 }}
+              style={{ minHeight: 500 }}
               keyboardShouldPersistTaps="handled"
             />
           </View>
@@ -581,8 +581,8 @@ const styles = StyleSheet.create({
   paymentOption: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
   paymentText: { fontSize: 13, fontWeight: '500' },
   tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: 14, marginTop: 8 },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: 14, marginTop: 8 ,marginBottom:40 },
+  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700', },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   pickerSheet: {  borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
   sheetTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },

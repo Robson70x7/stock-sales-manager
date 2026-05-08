@@ -26,10 +26,9 @@ import {
   formatDate,
   getPaymentTypeLabel,
   getSaleStatusColor,
+  isInMonth
 } from "@/lib/utils";
 import { Sale, PaymentType, SaleStatus, SummaryItem } from "@/types";
-import { isInMonth as isInMonthrUtil } from "@/lib/utils";
-import { getSaleItems } from "@/lib/database/db";
 
 const PAYMENT_TYPES: { value: PaymentType | "all"; label: string }[] = [
   { value: "all", label: "Todos" },
@@ -123,11 +122,6 @@ export default function SalesScreen() {
     } else {
       setCurrentMonth(currentMonth + 1);
     }
-  };
-
-  const isInMonth = (dateStr: string, year: number, month: number) => {
-    const date = new Date(dateStr);
-    return date.getFullYear() === year && date.getMonth() === month;
   };
 
   // Verifica se uma venda tem parcelas no mês especificado
@@ -279,7 +273,7 @@ export default function SalesScreen() {
     const averageValue = salesCount > 0 ? totalRevenue / salesCount : 0;
 
     return { totalRevenue, totalReceived, pending, salesCount, averageValue };
-  }, [state.sales, currentMonth, currentYear, isInMonth, hasParcelsInMonth]);
+  }, [state.sales, currentMonth, currentYear, hasParcelsInMonth]);
 
   const hasFilters = filterPayment !== "all" || filterStatus !== "all";
 

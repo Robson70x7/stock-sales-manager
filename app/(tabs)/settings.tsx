@@ -4,6 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ScreenContainer } from '@/components/screen-container';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
+import {DeviceInfo} from 'react-native-device-info'
 
 export default function SettingsScreen() {
   const { state, updateSettings } = useApp();
@@ -48,14 +49,14 @@ export default function SettingsScreen() {
           <View style={[styles.infoItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.infoRow}>
               <Text style={[styles.infoLabel, { color: colors.muted }]}>Versão</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>1.5.0</Text>
+              <Text style={[styles.infoValue, { color: colors.foreground }]}>{ DeviceInfo.getVersion() }</Text>
             </View>
           </View>
 
           <View style={[styles.infoItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <View style={styles.infoRow}>
               <Text style={[styles.infoLabel, { color: colors.muted }]}>Aplicativo</Text>
-              <Text style={[styles.infoValue, { color: colors.foreground }]}>VendaFácil</Text>
+              <Text style={[styles.infoValue, { color: colors.foreground }]}>{DeviceInfo.getApplicationName()}</Text>
             </View>
           </View>
         </View>

@@ -31,7 +31,7 @@ const SORT_OPTIONS: { value: SortOption; label: string }[] = [
 ];
 
 export default function ProductsScreen() {
-  const { state, updateProduct } = useApp();
+  const { state, addStockMovement } = useApp();
   const colors = useColors();
   const router = useRouter();
   const [search, setSearch] = useState('');
@@ -99,11 +99,16 @@ export default function ProductsScreen() {
   }, [state.products, search, categoryFilter, stockFilter, sortBy]);
 
   const handleQuickStockAdjust = async (product: Product, delta: number) => {
-    const newStock = Math.max(0, product.stock + delta);
-    if (newStock === product.stock) return;
+    if (delta < 0 && product.stock <= 0) return;
+    const type = delta > 0 ? 'in' : 'out';
     
     try {
-      await updateProduct({ ...product, stock: newStock });
+      await addStockMovement({
+        productId: product.id,
+        quantity: Math.abs(delta),
+        type,
+        notes: 'Ajuste rápido',
+      });
     } catch (error) {
       Alert.alert('Erro', 'Não foi possível atualizar o estoque');
     }

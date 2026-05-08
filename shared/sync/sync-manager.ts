@@ -5,6 +5,7 @@
 
 import { BaseSyncAdapter } from './sync-adapter';
 import { SyncState, SyncStrategy, SyncConflict, SyncMessage } from './types';
+import { getSetting, saveSetting } from '@/lib/database/db';
 
 export class SyncManager {
   private adapter?: BaseSyncAdapter;
@@ -23,6 +24,16 @@ export class SyncManager {
   async initialize(adapter: BaseSyncAdapter): Promise<void> {
     this.adapter = adapter;
     this.state.strategy = adapter.name;
+
+    // Carregar último timestamp de sincronização
+    try {
+      const lastSync = await getSetting('last_sync_timestamp');
+      if (lastSync) {
+        this.state.lastSync = parseInt(lastSync, 10);
+      }
+    } catch {
+      // Ignorar erro (db pode não estar disponível)
+    }
 
     // Registrar callback de mensagens
     adapter.onMessage((message: SyncMessage) => {
@@ -54,10 +65,17 @@ export class SyncManager {
     try {
       this.updateState({ status: 'syncing' });
       const result = await this.adapter.sync(data);
+      const now = Date.now();
       this.updateState({
         status: 'connected',
-        lastSync: Date.now(),
+        lastSync: now,
       });
+      // Persistir timestamp para sincronização incremental
+      try {
+        await saveSetting('last_sync_timestamp', now.toString());
+      } catch {
+        // Ignorar erro de persistência
+      }
       return result;
     } catch (error) {
       this.updateState({
