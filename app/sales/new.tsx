@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Modal, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -6,7 +6,7 @@ import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
 import { DatePickerField } from '@/components/ui/DatePickerField';
-import { generateInstallments, formatCurrency, getPaymentTypeLabel, applyCurrencyMask, unmaskCurrency } from '@/lib/utils';
+import { generateInstallments, generateInstallmentsWithEntry, formatCurrency, getPaymentTypeLabel, applyCurrencyMask, unmaskCurrency } from '@/lib/utils';
 import { PaymentType, SaleItem } from '@/types';
 
 const PAYMENT_TYPES: PaymentType[] = ['cash', 'pix', 'credit_card', 'debit_card'];
@@ -24,7 +24,9 @@ export default function NewSaleScreen() {
   const [firstInstallmentDate, setFirstInstallmentDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [items, setItems] = useState<SaleItem[]>([]);
-  const [manualAmount, setManualAmount] = useState('');
+  // const [manualAmount, setManualAmount] = useState('');
+  const [entryAmount, setEntryAmount] = useState('');
+  const [entryPaymentType, setEntryPaymentType] = useState<PaymentType>(paymentType);
   const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
   const [discountValue, setDiscountValue] = useState('');
   const [showClientPicker, setShowClientPicker] = useState(false);
@@ -36,7 +38,7 @@ export default function NewSaleScreen() {
   const selectedClient = state.clients.find(c => c.id === selectedClientId);
 
   const totalFromItems = items.reduce((sum, i) => sum + i.totalPrice, 0);
-  const subtotal = totalFromItems > 0 ? totalFromItems : unmaskCurrency(manualAmount);
+  const subtotal = totalFromItems
 
   const discountAmount = (() => {
     if (!discountValue || subtotal === 0) return 0;
@@ -48,10 +50,18 @@ export default function NewSaleScreen() {
   })();
 
   const totalAmount = Math.max(0, subtotal - discountAmount);
-
+  
+  useEffect(() => {
+    const entryVal = unmaskCurrency(entryAmount);
+    if (entryVal === 0) {
+      setEntryPaymentType(paymentType);
+    }
+  }, [paymentType, entryAmount]);
+  
   const toggleTag = (id: string) => {
     setSelectedTagIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id]);
   };
+
 
   const addProduct = (productId: string) => {
     const product = state.products.find(p => p.id === productId);
@@ -104,18 +114,29 @@ export default function NewSaleScreen() {
   const handleSave = async () => {
     if (totalAmount <=0) { Alert.alert('Atenção', 'Informe o valor da venda.'); return; }
 
+    const entryVal = unmaskCurrency(entryAmount);
+    if (entryVal > 0 && entryVal >= totalAmount) {
+      Alert.alert('Entrada', 'O valor de entrada não pode ser igual ou maior que o total. Marque como à vista.');
+      return;
+    }
+    if (entryVal > totalAmount) {
+      Alert.alert('Atenção', 'O valor de entrada não pode exceder o total da venda.');
+      return;
+    }
+
     setSaving(true);
     try {
-      console.log('Iniciando salvamento da venda:', { totalAmount, itemsCount: items.length, paymentType });
-
-      // Para crédito: pagamento único e já pago
       const isCredit = paymentType === 'credit_card';
       const count = isCredit ? 1 : installmentsCount;
       const saleStatus = isCredit ? 'paid' as const : 'pending' as const;
 
-      const installments = count > 1 && !isCredit
-        ? generateInstallments(totalAmount, count, firstInstallmentDate)
-        : [{
+      let installments;
+      if (entryVal > 0 && count > 1) {
+        installments = generateInstallmentsWithEntry(totalAmount, entryVal, count, firstInstallmentDate);
+      } else if (count > 1 && !isCredit) {
+        installments = generateInstallments(totalAmount, count, firstInstallmentDate);
+      } else {
+        installments = [{
             ...generateInstallments(totalAmount, 1, firstInstallmentDate)[0],
             status: isCredit ? 'paid' as const : 'pending' as const,
             paidDate: isCredit ? new Date().toISOString() : null,
@@ -125,9 +146,8 @@ export default function NewSaleScreen() {
               notes: isCredit ? 'Pago - Cartão de Crédito' : 'Parcela criada',
             }],
           }];
+      }
 
-      console.log('Chamando addSale com:', { itemsCount: items.length, installmentsCount: installments.length });
-      
       await addSale({
         description: description.trim() || undefined,
         clientId: selectedClientId,
@@ -137,6 +157,8 @@ export default function NewSaleScreen() {
         discountType: discountValue ? discountType : null,
         discountValue: discountValue ? (discountType === 'percentage' ? parseFloat(discountValue.replace(',', '.')) || 0 : unmaskCurrency(discountValue)) : 0,
         totalAmount,
+        entryAmount: entryVal > 0 ? entryVal : undefined,
+        entryPaymentType: entryVal > 0 ? entryPaymentType : undefined,
         paymentType,
         status: saleStatus,
         installmentsCount: count,
@@ -146,12 +168,10 @@ export default function NewSaleScreen() {
         firstInstallmentDate: new Date(firstInstallmentDate).toISOString(),
       });
       
-      console.log('Venda salva com sucesso!');
       router.back();
     } catch (e) {
       console.error('Erro ao salvar venda:', e);
       const errorMessage = e instanceof Error ? e.message : 'Erro desconhecido';
-      console.error('Detalhes do erro:', errorMessage);
       Alert.alert('Erro', `Não foi possível salvar a venda: ${errorMessage}`);
     } finally {
       setSaving(false);
@@ -222,52 +242,35 @@ export default function NewSaleScreen() {
               <Text style={[styles.addBtnText, { color: colors.primary }]}>Adicionar</Text>
             </Pressable>
           </View>
-          {items.length > 0 ? (
-            <View style={[styles.itemsList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              {items.map((item, idx) => (
-                <View key={item.productId}>
-                  {idx > 0 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
-                  <View style={styles.itemRow}>
-                    <View style={styles.itemInfo}>
-                      <Text style={[styles.itemName, { color: colors.foreground }]} numberOfLines={1}>{item.productName}</Text>
-                      <Text style={[styles.itemPrice, { color: colors.muted }]}>{formatCurrency(item.unitPrice)} un.</Text>
-                    </View>
-                    <View style={styles.qtyControl}>
-                      <Pressable onPress={() => updateItemQty(item.productId, item.quantity - 1)} style={styles.qtyBtn}>
-                        <MaterialIcons name="remove" size={16} color={colors.primary} />
-                      </Pressable>
-                      <Text style={[styles.qtyText, { color: colors.foreground }]}>{item.quantity}</Text>
-                      <Pressable onPress={() => updateItemQty(item.productId, item.quantity + 1)} style={styles.qtyBtn}>
-                        <MaterialIcons name="add" size={16} color={colors.primary} />
-                      </Pressable>
-                    </View>
-                    <Text style={[styles.itemTotal, { color: colors.foreground }]}>{formatCurrency(item.totalPrice)}</Text>
+          <View style={[styles.itemsList, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {items.map((item, idx) => (
+              <View key={item.productId}>
+                {idx > 0 && <View style={[styles.divider, { backgroundColor: colors.border }]} />}
+                <View style={styles.itemRow}>
+                  <View style={styles.itemInfo}>
+                    <Text style={[styles.itemName, { color: colors.foreground }]} numberOfLines={1}>{item.productName}</Text>
+                    <Text style={[styles.itemPrice, { color: colors.muted }]}>{formatCurrency(item.unitPrice)} un.</Text>
                   </View>
+                  <View style={styles.qtyControl}>
+                    <Pressable onPress={() => updateItemQty(item.productId, item.quantity - 1)} style={styles.qtyBtn}>
+                      <MaterialIcons name="remove" size={16} color={colors.primary} />
+                    </Pressable>
+                    <Text style={[styles.qtyText, { color: colors.foreground }]}>{item.quantity}</Text>
+                    <Pressable onPress={() => updateItemQty(item.productId, item.quantity + 1)} style={styles.qtyBtn}>
+                      <MaterialIcons name="add" size={16} color={colors.primary} />
+                    </Pressable>
+                  </View>
+                  <Text style={[styles.itemTotal, { color: colors.foreground }]}>{formatCurrency(item.totalPrice)}</Text>
                 </View>
-              ))}
-            </View>
-          ) : (
-            <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={styles.inputRow}>
-                <Text style={[styles.label, { color: colors.muted }]}>Valor Total *</Text>
-                <TextInput 
-                  style={[styles.input, { color: colors.foreground }]} 
-                  value={manualAmount} 
-                  onChangeText={(text) => setManualAmount(applyCurrencyMask(text))} 
-                  placeholder="R$ 0,00" 
-                  placeholderTextColor={colors.muted} 
-                  keyboardType="numeric" 
-                />
               </View>
-            </View>
-          )}
-          {totalAmount > 0 && (
-            <View style={[styles.totalRow, { backgroundColor: colors.primary + '10' }]}>
-              <Text style={[styles.totalLabel, { color: colors.primary }]}>Total</Text>
-              <Text style={[styles.totalValue, { color: colors.primary }]}>{formatCurrency(totalAmount)}</Text>
-            </View>
-          )}
-
+            ))}
+          </View>
+          
+          <View style={[styles.totalRow, { backgroundColor: colors.primary + '10' }]}>
+            <Text style={[styles.totalLabel, { color: colors.primary }]}>Total</Text>
+            <Text style={[styles.totalValue, { color: colors.primary }]}>{formatCurrency(totalAmount)}</Text>
+          </View>
+          
           {/* Seção de Desconto - Only when using products */}
           {totalFromItems > 0 && (
             <View style={styles.section}>
@@ -350,7 +353,40 @@ export default function NewSaleScreen() {
 
           {/* Opção de parcelas apenas para não-crédito */}
           {paymentType !== 'credit_card' && (
-            <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
+              <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
+              <View style={styles.inputRow}>
+                <Text style={[styles.label, { color: colors.muted }]}>Valor de Entrada</Text>
+                <TextInput
+                  style={[styles.input, { color: colors.foreground }]}
+                  value={entryAmount}
+                  onChangeText={(text) => setEntryAmount(applyCurrencyMask(text))}
+                  placeholder="R$ 0,00"
+                  placeholderTextColor={colors.muted}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+              {unmaskCurrency(entryAmount) > 0 && (
+                <>
+                  <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                  <View style={styles.inputRow}>
+                    <Text style={[styles.label, { color: colors.muted }]}>Tipo de Entrada</Text>
+                  </View>
+                  <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                      {PAYMENT_TYPES.map(pt => (
+                        <Pressable
+                          key={pt}
+                          onPress={() => setEntryPaymentType(pt)}
+                          style={[styles.paymentOption, { borderColor: colors.border }, entryPaymentType === pt && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                        >
+                          <Text style={[styles.paymentText, { color: entryPaymentType === pt ? '#fff' : colors.foreground }]}>{getPaymentTypeLabel(pt)}</Text>
+                        </Pressable>
+                      ))}
+                    </ScrollView>
+                  </View>
+                </>
+              )}
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
               <View style={styles.inputRow}>
                 <Text style={[styles.label, { color: colors.muted }]}>Nº de Parcelas</Text>
                 <View style={styles.qtyControl}>
@@ -366,7 +402,9 @@ export default function NewSaleScreen() {
               {totalAmount > 0 && installmentsCount > 1 && (
                 <View style={styles.inputRow}>
                   <Text style={[styles.label, { color: colors.muted }]}>Valor por Parcela</Text>
-                  <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>{formatCurrency(totalAmount / installmentsCount)}</Text>
+                  <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>
+                    {formatCurrency((totalAmount - unmaskCurrency(entryAmount)) / Math.max(1, installmentsCount))}
+                  </Text>
                 </View>
               )}
             </View>

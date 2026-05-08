@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useReducer, useCallback } from 'react';
-import { Tag, Product, Client, Sale, SaleItem, Installment, AppSettings } from '@/types';
+import { Tag, Product, Client, Sale, SaleItem, Installment, StockMovement, AppSettings, PaymentType } from '@/types';
 import * as db from '@/lib/database/db';
 import { generateId } from '@/lib/utils';
 
@@ -47,6 +47,8 @@ type AppAction =
   | { type: 'UPDATE_SALE'; payload: Sale }
   | { type: 'DELETE_SALE'; payload: string }
   | { type: 'UPDATE_INSTALLMENT'; payload: { saleId: string; installment: Installment } }
+  // Stock Movements
+  | { type: 'UPDATE_PRODUCT_STOCK'; payload: { productId: string; stock: number } }
   // Settings
   | { type: 'UPDATE_SETTINGS'; payload: Partial<AppSettings> };
 
@@ -100,6 +102,15 @@ function appReducer(state: AppState, action: AppAction): AppState {
         }),
       };
     }
+    case 'UPDATE_PRODUCT_STOCK':
+      return {
+        ...state,
+        products: state.products.map(p =>
+          p.id === action.payload.productId
+            ? { ...p, stock: action.payload.stock }
+            : p
+        ),
+      };
     // Settings
     case 'UPDATE_SETTINGS':
       return { ...state, settings: { ...state.settings, ...action.payload } };
@@ -130,6 +141,8 @@ interface AppContextType extends AppState {
   updateSale: (sale: Sale) => Promise<void>;
   deleteSale: (id: string, returnStock?: boolean) => Promise<void>;
   updateInstallment: (saleId: string, installment: Installment) => Promise<void>;
+  // Stock Movements
+  addStockMovement: (movement: Omit<StockMovement, 'id' | 'createdAt'>) => Promise<StockMovement>;
   // Settings
   updateSettings: (settings: Partial<AppSettings>) => Promise<void>;
 }
@@ -226,6 +239,8 @@ function toDbSale(sale: Sale): db.DbSale {
     discountType: sale.discountType || null,
     discountValue: sale.discountValue,
     totalAmount: sale.totalAmount,
+    entryAmount: sale.entryAmount ?? null,
+    entryPaymentType: sale.entryPaymentType || null,
     status: sale.status,
     saleDate: sale.saleDate,
     firstInstallmentDate: sale.firstInstallmentDate || null,
@@ -252,6 +267,8 @@ function fromDbSale(row: db.DbSale, items: db.DbSaleItem[], installments: db.DbI
         discountType: row.discountType as Sale['discountType'] || null,
         discountValue: row.discountValue,
         totalAmount: row.totalAmount,
+        entryAmount: row.entryAmount ?? undefined,
+        entryPaymentType: row.entryPaymentType as PaymentType || undefined,
         paymentType: row.paymentType as Sale['paymentType'],
         status: row.status as Sale['status'],
         installmentsCount: row.installmentsCount,
@@ -276,7 +293,7 @@ function fromDbSale(row: db.DbSale, items: db.DbSaleItem[], installments: db.DbI
 
 function toDbSaleItem(item: SaleItem, saleId: string): db.DbSaleItem {
   return {
-    id: item.productId,
+    id: generateId(),
     saleId,
     productId: item.productId,
     productName: item.productName,
@@ -411,6 +428,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await db.deleteClient(id);
   }, []);
 
+  // ---- Stock Movements ----
+  const addStockMovement = useCallback(async (
+    movementData: Omit<StockMovement, 'id' | 'createdAt'>
+  ): Promise<StockMovement> => {
+    const now = new Date().toISOString();
+    const movement: StockMovement = {
+      ...movementData,
+      id: generateId(),
+      createdAt: now,
+    };
+
+    await db.saveStockMovement({
+      id: movement.id,
+      productId: movement.productId,
+      quantity: movement.quantity,
+      type: movement.type,
+      referenceId: movement.referenceId || null,
+      notes: movement.notes || null,
+      createdAt: movement.createdAt,
+      isDeleted: 0,
+    });
+
+    const newStock = await db.getProductStock(movement.productId);
+    dispatch({ type: 'UPDATE_PRODUCT_STOCK', payload: { productId: movement.productId, stock: newStock } });
+
+    return movement;
+  }, []);
+
   // ---- Sales ----
   const addSale = useCallback(async (
     saleData: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>
@@ -418,7 +463,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const id = generateId();
     
-    // CORREÇÃO: Não sobrescrever items e installments de saleData
     const sale: Sale = {
       ...saleData,
       id,
@@ -426,95 +470,47 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       updatedAt: now,
     };
 
-    try{
-      console.log("Salvando venda:", { id: sale.id, totalAmount: sale.totalAmount, itemsCount: sale.items.length, installmentsCount: sale.installments.length });
-      console.log("Sale data for DB:", JSON.stringify(toDbSale(sale), null, 2));
-      
-      await db.saveSale(toDbSale(sale));
-      console.log("Venda salva no DB com sucesso");
-    }catch (e) {
-      console.error("ERRO AO SALVAR VENDA:", e);
-      console.error("Sale object:", JSON.stringify(sale, null, 2));
-      throw e;
+    await db.saveSale(toDbSale(sale));
+
+    // Salvar itens
+    sale.items = sale.items.map(item => ({ ...item, saleId: sale.id }));
+    for (const item of sale.items) {
+      await db.saveSaleItem(toDbSaleItem(item, sale.id));
     }
 
-    try{
-      console.log("Salvando itens:", { count: sale.items.length, saleId: sale.id });
-      // Atualizar saleId dos itens para o novo ID
-      sale.items = sale.items.map(item => ({
-        ...item,
-        saleId: sale.id,
-      }));
-      
-      // Salvar itens
-      for (const item of sale.items) {
-        console.log("Saving item:", JSON.stringify(toDbSaleItem(item, sale.id), null, 2));
-        await db.saveSaleItem(toDbSaleItem(item, sale.id));
-      }
-      console.log("Itens salvos com sucesso");
-    }catch(e){
-      console.error("ERRO AO SALVAR ITENS DA VENDA:", e);
-      console.error("Items:", JSON.stringify(sale.items, null, 2));
-      throw e;
+    // Salvar parcelas
+    sale.installments = sale.installments.map(inst => ({ ...inst, saleId: sale.id }));
+    for (const inst of sale.installments) {
+      await db.saveInstallment(toDbInstallment(inst));
     }
 
-    try{
-      console.log("Salvando parcelas:", { count: sale.installments.length, saleId: sale.id });
-      // Atualizar saleId das parcelas para o novo ID
-      sale.installments = sale.installments.map(inst => ({
-        ...inst,
-        saleId: sale.id,
-      }));
-      // Salvar installments (já com saleId correto)
-      for (const inst of sale.installments) {
-        console.log("Saving installment:", JSON.stringify(toDbInstallment(inst), null, 2));
-        await db.saveInstallment(toDbInstallment(inst));
-      }
-      console.log("Parcelas salvas com sucesso");
-    }catch(e){
-      console.error("ERRO AO SALVAR PARCELAS DA VENDA:", e);
-      console.error("Installments:", JSON.stringify(sale.installments, null, 2));
-      throw e;
+    // Criar stock_movements para cada item (type='out')
+    for (const item of sale.items) {
+      const movement: StockMovement = {
+        id: generateId(),
+        productId: item.productId,
+        quantity: item.quantity,
+        type: 'out',
+        referenceId: sale.id,
+        notes: `Venda #${sale.id.slice(0, 8)}`,
+        createdAt: now,
+      };
+      await db.saveStockMovement({
+        id: movement.id,
+        productId: movement.productId,
+        quantity: movement.quantity,
+        type: movement.type,
+        referenceId: movement.referenceId || null,
+        notes: movement.notes || null,
+        createdAt: movement.createdAt,
+        isDeleted: 0,
+      });
+
+      // Atualizar cache de estoque local
+      const newStock = await db.getProductStock(item.productId);
+      dispatch({ type: 'UPDATE_PRODUCT_STOCK', payload: { productId: item.productId, stock: newStock } });
     }
 
-    try{
-      console.log("Salvando itens:", { count: sale.items.length, saleId: sale.id });
-
-      // Atualizar saleId dos itens para o novo ID
-      sale.items = sale.items.map(item => ({
-        ...item,
-        saleId: sale.id,
-      }));
-      
-
-      // Salvar itens
-      for (const item of sale.items) {
-        await db.saveSaleItem(toDbSaleItem(item, sale.id));
-      }
-      console.log("Itens salvos com sucesso");
-    }catch(e){
-      console.error("ERRO AO SALVAR ITENS DA VENDA:", e);
-      throw e;
-    }
-
-    try{
-      console.log("Salvando parcelas:", { count: sale.installments.length, saleId: sale.id });
-      // Atualizar saleId das parcelas para o novo ID
-      sale.installments = sale.installments.map(inst => ({
-        ...inst,
-        saleId: sale.id,
-      }));
-      // Salvar installments (já com saleId correto)
-      for (const inst of sale.installments) {
-        await db.saveInstallment(toDbInstallment(inst));
-      }
-      console.log("Parcelas salvas com sucesso");
-    }catch(e){
-      console.error("ERRO AO SALVAR PARCELAS DA VENDA:", e);
-      throw e;
-    }
-
-    // Só atualiza o estado local após salvar tudo com sucesso
     dispatch({ type: 'ADD_SALE', payload: sale });
     return sale;
   }, []);
@@ -524,7 +520,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     dispatch({ type: 'UPDATE_SALE', payload: updated });
     await db.saveSale(toDbSale(updated));
 
-    // Atualizar items e parcelas
     await db.deleteSaleItems(sale.id);
     for (const item of sale.items) {
       await db.saveSaleItem(toDbSaleItem(item, sale.id));
@@ -536,11 +531,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteSale = useCallback(async (id: string, returnStock: boolean = true) => {
-    // Se returnStock, devolver estoque dos produtos
+    // Soft-delete stock movements (reverte o efeito no estoque)
+    await db.deleteStockMovementsByReference(id);
+
     if (returnStock) {
       const items = await db.getSaleItems(id);
       for (const item of items) {
-        await db.updateProductStock(item.productId, item.quantity);
+        const newStock = await db.getProductStock(item.productId);
+        dispatch({ type: 'UPDATE_PRODUCT_STOCK', payload: { productId: item.productId, stock: newStock } });
       }
     }
 
@@ -578,6 +576,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     updateSale,
     deleteSale,
     updateInstallment,
+    addStockMovement,
     updateSettings,
   };
 

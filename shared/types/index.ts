@@ -5,6 +5,7 @@
 export type PaymentType = 'cash' | 'pix' | 'credit_card' | 'debit_card';
 export type SaleStatus = 'pending' | 'partial' | 'paid' | 'cancelled';
 export type InstallmentStatus = 'pending' | 'paid' | 'overdue';
+export type StockMovementType = 'in' | 'out' | 'initial' | 'adjustment';
 
 export interface Tag {
   id: string;
@@ -75,6 +76,8 @@ export interface Sale {
   discountType?: 'percentage' | 'fixed' | null;
   discountValue: number;
   totalAmount: number;
+  entryAmount?: number;
+  entryPaymentType?: PaymentType;
   paymentType: PaymentType;
   status: SaleStatus;
   installmentsCount: number;
@@ -84,6 +87,16 @@ export interface Sale {
   firstInstallmentDate?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  quantity: number;
+  type: StockMovementType;
+  referenceId?: string;
+  notes?: string;
+  createdAt: string;
 }
 
 // Dados agregados para o resumo mensal
@@ -113,6 +126,8 @@ export interface SummaryItem {
   installmentInfo?: {
     number: number;
     total: number;
+    isEntry?: boolean;
+    entryPaymentType?: PaymentType;
   };
 }
 

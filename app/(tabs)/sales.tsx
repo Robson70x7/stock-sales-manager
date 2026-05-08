@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useCallback, useRef } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -170,7 +170,7 @@ export default function SalesScreen() {
       } else {
         // Vendas parceladas - cada parcela aparece no seu mês de vencimento
         sale.installments.forEach((inst) => {
-          if (isInMonth(inst.dueDate, currentYear, currentMonth)) {
+          if (inst.status === 'paid' ? isInMonth(inst.paidDate as string, currentYear, currentMonth) : isInMonth(inst.dueDate, currentYear, currentMonth)) {
             result.push({
               id: inst.id,
               type: "installment",
@@ -187,6 +187,8 @@ export default function SalesScreen() {
               installmentInfo: {
                 number: inst.number,
                 total: inst.totalInstallments,
+                isEntry: sale.entryAmount ? inst.number === 0 : undefined,
+                entryPaymentType: sale.entryPaymentType,
               },
             });
           }
@@ -265,8 +267,8 @@ export default function SalesScreen() {
         .flatMap((s) => s.installments)
         .filter(
           (i) =>
-            isInMonth(i.dueDate, currentYear, currentMonth) &&
-            i.status === "paid",
+            i.status === "paid" &&
+            isInMonth(i.paidDate as string, currentYear, currentMonth)
         )
         .reduce((sum, i) => sum + i.amount, 0);
 
@@ -303,6 +305,13 @@ export default function SalesScreen() {
               numberOfLines={1}
             >
               {item.title || "Venda"}
+              {item.installmentInfo && (
+                <>
+                  <Text style={[styles.metaText, { color: colors.muted }]}>
+                    {' '}({item.installmentInfo.isEntry ? `Entrada · ${getPaymentTypeLabel(item.installmentInfo.entryPaymentType || item.paymentType)}` : `${item.installmentInfo.number}/${item.installmentInfo.total}`})
+                  </Text>
+                </>
+              )}
             </Text>
             {item.clientName && (
               <View style={styles.clientRow}>
@@ -314,22 +323,13 @@ export default function SalesScreen() {
             )}
             <View style={styles.metaRow}>
               <Text style={[styles.metaText, { color: colors.muted }]}>
-                {formatDate(item.dueDate)}
+                {formatDate(item.dueDate)} {item.paidDate ? ` | Pago: ${formatDate(item.paidDate)}` : ''}
               </Text>
-              <Text style={[styles.metaDot, { color: colors.muted }]}>·</Text>
+              {/* <Text style={[styles.metaDot, { color: colors.muted }]}>·</Text>
               <Text style={[styles.metaText, { color: colors.muted }]}>
                 {getPaymentTypeLabel(item.paymentType)}
-              </Text>
-              {item.installmentInfo && (
-                <>
-                  <Text style={[styles.metaDot, { color: colors.muted }]}>
-                    ·
-                  </Text>
-                  <Text style={[styles.metaText, { color: colors.muted }]}>
-                    {item.installmentInfo.number}/{item.installmentInfo.total}x
-                  </Text>
-                </>
-              )}
+              </Text> */}
+              
             </View>
           </View>
           <View style={styles.cardRight}>

@@ -56,6 +56,61 @@ export async function migrateDbIfNeeded(db: SQLite.SQLiteDatabase): Promise<void
 }
 
 // ============================================================
+// STOCK MOVEMENTS
+// ============================================================
+export interface DbStockMovement {
+  id: string;
+  productId: string;
+  quantity: number;
+  type: string;
+  referenceId: string | null;
+  notes: string | null;
+  createdAt: string;
+  isDeleted: number;
+}
+
+export async function getStockMovementsByProduct(productId: string): Promise<DbStockMovement[]> {
+  const database = await getDb();
+  const rows = await database.getAllAsync<DbStockMovement>(
+    'SELECT * FROM stock_movements WHERE productId = ? AND isDeleted = 0 ORDER BY createdAt',
+    [productId]
+  );
+  return rows;
+}
+
+export async function saveStockMovement(movement: DbStockMovement): Promise<DbStockMovement> {
+  const database = await getDb();
+  await database.runAsync(
+    `INSERT INTO stock_movements (id, productId, quantity, type, referenceId, notes, createdAt, isDeleted)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+    sanitizeParams([movement.id, movement.productId, movement.quantity, movement.type,
+      movement.referenceId, movement.notes, movement.createdAt])
+  );
+  return movement;
+}
+
+export async function deleteStockMovementsByReference(referenceId: string): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    'UPDATE stock_movements SET isDeleted = 1 WHERE referenceId = ?',
+    [referenceId]
+  );
+}
+
+export async function getProductStock(productId: string): Promise<number> {
+  const database = await getDb();
+  const row = await database.getFirstAsync<{ stock: number }>(
+    `SELECT
+       COALESCE(SUM(CASE WHEN type IN ('in','initial') THEN quantity ELSE 0 END), 0)
+       - COALESCE(SUM(CASE WHEN type = 'out' THEN quantity ELSE 0 END), 0) as stock
+     FROM stock_movements
+     WHERE productId = ? AND isDeleted = 0`,
+    [productId]
+  );
+  return row?.stock ?? 0;
+}
+
+// ============================================================
 // TAGS
 // ============================================================
 export interface DbTag {
@@ -67,13 +122,13 @@ export interface DbTag {
 
 export async function getTags(): Promise<DbTag[]> {
   const database = await getDb();
-  const rows = await database.getAllAsync<DbTag>('SELECT * FROM tags ORDER BY name');
+  const rows = await database.getAllAsync<DbTag>('SELECT * FROM tags WHERE isDeleted = 0 ORDER BY name');
   return rows;
 }
 
 export async function getTagById(id: string): Promise<DbTag | undefined> {
   const database = await getDb();
-  const row = await database.getFirstAsync<DbTag>('SELECT * FROM tags WHERE id = ?', [id]);
+  const row = await database.getFirstAsync<DbTag>('SELECT * FROM tags WHERE id = ? AND isDeleted = 0', [id]);
   return row || undefined;
 }
 
@@ -96,7 +151,10 @@ export async function saveTag(tag: DbTag): Promise<DbTag> {
 
 export async function deleteTag(id: string): Promise<void> {
   const database = await getDb();
-  await database.runAsync('DELETE FROM tags WHERE id = ?', [id]);
+  await database.runAsync(
+    'UPDATE tags SET isDeleted = 1 WHERE id = ?',
+    [id]
+  );
 }
 
 // ============================================================
@@ -118,25 +176,30 @@ export interface DbProduct {
 
 export async function getProducts(): Promise<DbProduct[]> {
   const database = await getDb();
-  const rows = await database.getAllAsync<DbProduct>('SELECT * FROM products ORDER BY name');
+  const rows = await database.getAllAsync<DbProduct>(
+    'SELECT p.*, COALESCE((SELECT SUM(CASE WHEN sm.type IN (\'in\',\'initial\') THEN sm.quantity ELSE 0 END) - SUM(CASE WHEN sm.type = \'out\' THEN sm.quantity ELSE 0 END) FROM stock_movements sm WHERE sm.productId = p.id AND sm.isDeleted = 0), 0) as stock FROM products p WHERE p.isDeleted = 0 ORDER BY p.name'
+  );
   return rows;
 }
 
 export async function getProductById(id: string): Promise<DbProduct | undefined> {
   const database = await getDb();
-  const row = await database.getFirstAsync<DbProduct>('SELECT * FROM products WHERE id = ?', [id]);
+  const row = await database.getFirstAsync<DbProduct>(
+    'SELECT p.*, COALESCE((SELECT SUM(CASE WHEN sm.type IN (\'in\',\'initial\') THEN sm.quantity ELSE 0 END) - SUM(CASE WHEN sm.type = \'out\' THEN sm.quantity ELSE 0 END) FROM stock_movements sm WHERE sm.productId = p.id AND sm.isDeleted = 0), 0) as stock FROM products p WHERE p.id = ? AND p.isDeleted = 0',
+    [id]
+  );
   return row || undefined;
 }
 
 export async function saveProduct(product: DbProduct): Promise<DbProduct> {
   const database = await getDb();
-  const existing = await getProductById(product.id);
+  const existing = await database.getFirstAsync<DbProduct>('SELECT * FROM products WHERE id = ?', [product.id]);
   if (existing) {
     await database.runAsync(
       `UPDATE products SET name = ?, description = ?, category = ?, costPrice = ?, 
-       salePrice = ?, stock = ?, unit = ?, photoUri = ?, updatedAt = ? WHERE id = ?`,
+       salePrice = ?, unit = ?, photoUri = ?, updatedAt = ? WHERE id = ? AND isDeleted = 0`,
       sanitizeParams([product.name, product.description, product.category, product.costPrice,
-       product.salePrice, product.stock, product.unit, product.photoUri, product.updatedAt, product.id])
+       product.salePrice, product.unit, product.photoUri, product.updatedAt, product.id])
     );
     return product;
   }
@@ -151,14 +214,9 @@ export async function saveProduct(product: DbProduct): Promise<DbProduct> {
 
 export async function deleteProduct(id: string): Promise<void> {
   const database = await getDb();
-  await database.runAsync('DELETE FROM products WHERE id = ?', [id]);
-}
-
-export async function updateProductStock(id: string, quantity: number): Promise<void> {
-  const database = await getDb();
   await database.runAsync(
-    'UPDATE products SET stock = stock + ?, updatedAt = ? WHERE id = ?',
-    sanitizeParams([quantity, new Date().toISOString(), id])
+    'UPDATE products SET isDeleted = 1, updatedAt = ? WHERE id = ?',
+    [new Date().toISOString(), id]
   );
 }
 
@@ -179,13 +237,13 @@ export interface DbClient {
 
 export async function getClients(): Promise<DbClient[]> {
   const database = await getDb();
-  const rows = await database.getAllAsync<DbClient>('SELECT * FROM clients ORDER BY name');
+  const rows = await database.getAllAsync<DbClient>('SELECT * FROM clients WHERE isDeleted = 0 ORDER BY name');
   return rows;
 }
 
 export async function getClientById(id: string): Promise<DbClient | undefined> {
   const database = await getDb();
-  const row = await database.getFirstAsync<DbClient>('SELECT * FROM clients WHERE id = ?', [id]);
+  const row = await database.getFirstAsync<DbClient>('SELECT * FROM clients WHERE id = ? AND isDeleted = 0', [id]);
   return row || undefined;
 }
 
@@ -212,7 +270,10 @@ export async function saveClient(client: DbClient): Promise<DbClient> {
 
 export async function deleteClient(id: string): Promise<void> {
   const database = await getDb();
-  await database.runAsync('DELETE FROM clients WHERE id = ?', [id]);
+  await database.runAsync(
+    'UPDATE clients SET isDeleted = 1, updatedAt = ? WHERE id = ?',
+    [new Date().toISOString(), id]
+  );
 }
 
 // ============================================================
@@ -229,6 +290,8 @@ export interface DbSale {
   discountType: string | null;
   discountValue: number;
   totalAmount: number;
+  entryAmount: number | null;
+  entryPaymentType: string | null;
   status: string;
   saleDate: string;
   firstInstallmentDate: string | null;
@@ -239,39 +302,39 @@ export interface DbSale {
 
 export async function getSales(): Promise<DbSale[]> {
   const database = await getDb();
-  const rows = await database.getAllAsync<DbSale>('SELECT * FROM sales ORDER BY saleDate DESC');
+  const rows = await database.getAllAsync<DbSale>('SELECT * FROM sales WHERE isDeleted = 0 ORDER BY saleDate DESC');
   return rows;
 }
 
 export async function getSaleById(id: string): Promise<DbSale | undefined> {
   const database = await getDb();
-  const row = await database.getFirstAsync<DbSale>('SELECT * FROM sales WHERE id = ?', [id]);
+  const row = await database.getFirstAsync<DbSale>('SELECT * FROM sales WHERE id = ? AND isDeleted = 0', [id]);
   return row || undefined;
 }
 
 export async function saveSale(sale: DbSale): Promise<DbSale> {
   const database = await getDb();
-  const existing = await getSaleById(sale.id);
+  const existing = await database.getFirstAsync<DbSale>('SELECT * FROM sales WHERE id = ?', [sale.id]);
   if (existing) {
     await database.runAsync(
       `UPDATE sales SET description = ?, clientId = ?, clientName = ?, paymentType = ?, 
        installmentsCount = ?, subtotal = ?, discountType = ?, discountValue = ?, 
-       totalAmount = ?, status = ?, saleDate = ?, firstInstallmentDate = ?, 
+       totalAmount = ?, entryAmount = ?, entryPaymentType = ?, status = ?, saleDate = ?, firstInstallmentDate = ?, 
        tagIds = ?, updatedAt = ? WHERE id = ?`,
       sanitizeParams([sale.description, sale.clientId, sale.clientName, sale.paymentType,
        sale.installmentsCount, sale.subtotal, sale.discountType, sale.discountValue,
-       sale.totalAmount, sale.status, sale.saleDate, sale.firstInstallmentDate,
+       sale.totalAmount, sale.entryAmount, sale.entryPaymentType, sale.status, sale.saleDate, sale.firstInstallmentDate,
        sale.tagIds, sale.updatedAt, sale.id])
     );
     return sale;
   }
   await database.runAsync(
     `INSERT INTO sales (id, description, clientId, clientName, paymentType, installmentsCount, 
-     subtotal, discountType, discountValue, totalAmount, status, saleDate, firstInstallmentDate, 
-     tagIds, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     subtotal, discountType, discountValue, totalAmount, entryAmount, entryPaymentType, status, saleDate, firstInstallmentDate, 
+     tagIds, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     sanitizeParams([sale.id, sale.description, sale.clientId, sale.clientName, sale.paymentType,
      sale.installmentsCount, sale.subtotal, sale.discountType, sale.discountValue,
-     sale.totalAmount, sale.status, sale.saleDate, sale.firstInstallmentDate,
+     sale.totalAmount, sale.entryAmount, sale.entryPaymentType, sale.status, sale.saleDate, sale.firstInstallmentDate,
      sale.tagIds, sale.createdAt, sale.updatedAt])
   ); 
   return sale;
@@ -279,7 +342,10 @@ export async function saveSale(sale: DbSale): Promise<DbSale> {
 
 export async function deleteSale(id: string): Promise<void> {
   const database = await getDb();
-  await database.runAsync('DELETE FROM sales WHERE id = ?', [id]);
+  await database.runAsync(
+    'UPDATE sales SET isDeleted = 1, updatedAt = ? WHERE id = ?',
+    [new Date().toISOString(), id]
+  );
 }
 
 // ============================================================
@@ -298,7 +364,7 @@ export interface DbSaleItem {
 export async function getSaleItems(saleId: string): Promise<DbSaleItem[]> {
   const database = await getDb();
   const rows = await database.getAllAsync<DbSaleItem>(
-    'SELECT * FROM sale_items WHERE saleId = ?',
+    'SELECT * FROM sale_items WHERE saleId = ? AND isDeleted = 0',
     [saleId]
   );
   return rows;
@@ -306,18 +372,32 @@ export async function getSaleItems(saleId: string): Promise<DbSaleItem[]> {
 
 export async function saveSaleItem(item: DbSaleItem): Promise<DbSaleItem> {
   const database = await getDb();
-  await database.runAsync('DELETE FROM sale_items WHERE id = ?', sanitizeParams([item.id]));
-  await database.runAsync(
-    `INSERT INTO sale_items (id, saleId, productId, productName, quantity, unitPrice, totalPrice) 
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    sanitizeParams([item.id, item.saleId, item.productId, item.productName, item.quantity, item.unitPrice, item.totalPrice])
+  const existing = await database.getFirstAsync<{ id: string }>(
+    'SELECT id FROM sale_items WHERE id = ?', [item.id]
   );
+  if (existing) {
+    await database.runAsync(
+      `UPDATE sale_items SET saleId = ?, productId = ?, productName = ?, quantity = ?, 
+       unitPrice = ?, totalPrice = ?, isDeleted = 0 WHERE id = ?`,
+      sanitizeParams([item.saleId, item.productId, item.productName, item.quantity,
+        item.unitPrice, item.totalPrice, item.id])
+    );
+  } else {
+    await database.runAsync(
+      `INSERT INTO sale_items (id, saleId, productId, productName, quantity, unitPrice, totalPrice, isDeleted) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, 0)`,
+      sanitizeParams([item.id, item.saleId, item.productId, item.productName, item.quantity, item.unitPrice, item.totalPrice])
+    );
+  }
   return item;
 }
 
 export async function deleteSaleItems(saleId: string): Promise<void> {
   const database = await getDb();
-  await database.runAsync('DELETE FROM sale_items WHERE saleId = ?', [saleId]);
+  await database.runAsync(
+    'UPDATE sale_items SET isDeleted = 1 WHERE saleId = ?',
+    [saleId]
+  );
 }
 
 // ============================================================
@@ -338,7 +418,7 @@ export interface DbInstallment {
 export async function getInstallments(saleId: string): Promise<DbInstallment[]> {
   const database = await getDb();
   const rows = await database.getAllAsync<DbInstallment>(
-    'SELECT * FROM installments WHERE saleId = ? ORDER BY number',
+    'SELECT * FROM installments WHERE saleId = ? AND isDeleted = 0 ORDER BY number',
     [saleId]
   );
   return rows;
@@ -346,19 +426,34 @@ export async function getInstallments(saleId: string): Promise<DbInstallment[]> 
 
 export async function saveInstallment(installment: DbInstallment): Promise<DbInstallment> {
   const database = await getDb();
-  await database.runAsync('DELETE FROM installments WHERE id = ?', sanitizeParams([installment.id]));
-  await database.runAsync(
-    `INSERT INTO installments (id, saleId, number, totalInstallments, amount, 
-     dueDate, paidDate, status, history) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    sanitizeParams([installment.id, installment.saleId, installment.number, installment.totalInstallments,
-     installment.amount, installment.dueDate, installment.paidDate, installment.status, installment.history])
+  const existing = await database.getFirstAsync<{ id: string }>(
+    'SELECT id FROM installments WHERE id = ?', [installment.id]
   );
+  if (existing) {
+    await database.runAsync(
+      `UPDATE installments SET saleId = ?, number = ?, totalInstallments = ?, amount = ?, 
+       dueDate = ?, paidDate = ?, status = ?, history = ?, isDeleted = 0 WHERE id = ?`,
+      sanitizeParams([installment.saleId, installment.number, installment.totalInstallments,
+        installment.amount, installment.dueDate, installment.paidDate, installment.status,
+        installment.history, installment.id])
+    );
+  } else {
+    await database.runAsync(
+      `INSERT INTO installments (id, saleId, number, totalInstallments, amount, 
+       dueDate, paidDate, status, history, isDeleted) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+      sanitizeParams([installment.id, installment.saleId, installment.number, installment.totalInstallments,
+        installment.amount, installment.dueDate, installment.paidDate, installment.status, installment.history])
+    );
+  }
   return installment;
 }
 
 export async function deleteInstallments(saleId: string): Promise<void> {
   const database = await getDb();
-  await database.runAsync('DELETE FROM installments WHERE saleId = ?', [saleId]);
+  await database.runAsync(
+    'UPDATE installments SET isDeleted = 1 WHERE saleId = ?',
+    [saleId]
+  );
 }
 
 // ============================================================

@@ -162,6 +162,19 @@ export default function EditSaleScreen() {
           {/* Opção de parcelas apenas para não-crédito */}
           {!isCredit && (
             <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 10 }]}>
+              {sale.entryAmount ? (
+                <View style={styles.inputRow}>
+                  <Text style={[styles.label, { color: colors.muted }]}>Entrada</Text>
+                  <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>{formatCurrency(sale.entryAmount)}</Text>
+                </View>
+              ) : null}
+              {sale.entryPaymentType ? (
+                <View style={styles.inputRow}>
+                  <Text style={[styles.label, { color: colors.muted }]}>Tipo de Entrada</Text>
+                  <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>{getPaymentTypeLabel(sale.entryPaymentType)}</Text>
+                </View>
+              ) : null}
+              <View style={[styles.divider, { backgroundColor: colors.border }]} />
               <View style={styles.inputRow}>
                 <Text style={[styles.label, { color: colors.muted }]}>Nº de Parcelas</Text>
                 <View style={styles.qtyControl}>
@@ -177,7 +190,7 @@ export default function EditSaleScreen() {
               {totalAmount > 0 && installmentsCount > 1 && (
                 <View style={styles.inputRow}>
                   <Text style={[styles.label, { color: colors.muted }]}>Valor por Parcela</Text>
-                  <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>{formatCurrency(totalAmount / installmentsCount)}</Text>
+                  <Text style={[styles.input, { color: colors.primary, textAlign: 'right' }]}>{formatCurrency((totalAmount - (sale.entryAmount || 0)) / installmentsCount)}</Text>
                 </View>
               )}
             </View>

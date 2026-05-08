@@ -9,7 +9,15 @@ export const migrations: { version: number; name: string }[] = [
   {
     "version": 3,
     "name": "dates_to_text"
+  },
+  {
+    "version": 4,
+    "name": "stock_movements"
+  },
+  {
+    "version": 5,
+    "name": "entry_payment_type"
   }
 ];
 
-export const LATEST_VERSION = 3;
+export const LATEST_VERSION = 5;

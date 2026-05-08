@@ -132,6 +132,65 @@ export function generateId(): string {
   });
 }
 
+// Gera parcelas com entrada
+export function generateInstallmentsWithEntry(
+  totalAmount: number,
+  entryAmount: number,
+  count: number,
+  startDate: string
+): import('@/types').Installment[] {
+  const remaining = totalAmount - entryAmount;
+  const remainingCount = count;
+  const installmentAmount = remainingCount > 0 ? Math.round((remaining / remainingCount) * 100) / 100 : 0;
+  const start = new Date(startDate);
+  const offset = start.getTimezoneOffset() * 60000;
+  const localStart = new Date(start.getTime() + offset);
+
+  const installments: import('@/types').Installment[] = [];
+
+  // Parcela de entrada (número 0, vence na data inicial)
+  const entryDue = new Date(localStart);
+  const utcEntry = new Date(entryDue.getTime() - offset);
+  installments.push({
+    id: generateId(),
+    saleId: '',
+    number: 0,
+    totalInstallments: count,
+    amount: entryAmount,
+    dueDate: utcEntry.toISOString(),
+    status: 'paid' as const,
+    paidDate: new Date().toISOString(),
+    history: [{
+      date: new Date().toISOString(),
+      status: 'paid' as const,
+      notes: 'Entrada',
+    }],
+  });
+
+  // Demais parcelas
+  for (let i = 1; i <= count; i++) {
+    const dueDate = new Date(localStart);
+    dueDate.setMonth(dueDate.getMonth() + i);
+    const utcDueDate = new Date(dueDate.getTime() - offset);
+    installments.push({
+      id: generateId(),
+      saleId: '',
+      number: i,
+      totalInstallments: count,
+      amount: installmentAmount,
+      dueDate: utcDueDate.toISOString(),
+      status: 'pending' as const,
+      history: [{
+        date: new Date().toISOString(),
+        status: 'pending' as const,
+        notes: 'Parcela criada',
+      }],
+    });
+  }
+
+  return installments;
+}
+
 // Gera parcelas automaticamente
 // saleId será preenchido pelo contexto antes de salvar
 export function generateInstallments(

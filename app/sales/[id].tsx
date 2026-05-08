@@ -102,6 +102,7 @@ export default function SaleDetailScreen() {
           <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.statLabel, { color: colors.muted }]}>Total</Text>
             <Text style={[styles.statValue, { color: colors.foreground }]}>{formatCurrency(sale.totalAmount)}</Text>
+            <Text style={[styles.statLabel, {color: colors.error }]}>Desconto: { formatCurrency(sale.discountValue) }</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.statLabel, { color: colors.muted }]}>Recebido</Text>
@@ -125,12 +126,10 @@ export default function SaleDetailScreen() {
               <View key={item.productId} style={[styles.itemRow, idx > 0 && { borderTopWidth: 0.5, borderTopColor: colors.border }]}>
                 <Text style={[styles.itemName, { color: colors.foreground }]}>{item.productName}</Text>
                 <Text style={[styles.itemQty, { color: colors.muted }]}>{item.quantity}x {formatCurrency(item.unitPrice)}</Text>
-                <Text style={[styles.itemTotal, { color: colors.foreground }]}>{formatCurrency(item.totalPrice)}</Text>
               </View>
             ))}
           </View>
         )}
-
         {/* Parcelas */}
         {sale.installments.length > 0 && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -152,7 +151,11 @@ export default function SaleDetailScreen() {
                 </View>
                 <View style={styles.installmentInfo}>
                   <Text style={[styles.installmentLabel, { color: colors.foreground }]}>
-                    {sale.installmentsCount > 1 ? `Parcela ${inst.number}/${inst.totalInstallments}` : 'Pagamento único'}
+                    {sale.entryAmount && inst.number === 0 && inst.status === 'paid'
+                      ? `Entrada (${getPaymentTypeLabel(sale.entryPaymentType || sale.paymentType)})`
+                      : sale.installmentsCount > 1
+                        ? `Parcela ${inst.number}/${inst.totalInstallments}`
+                        : 'Pagamento único'}
                   </Text>
                   <Text style={[styles.installmentDate, { color: colors.muted }]}>
                     Venc: {formatDate(inst.dueDate)}
