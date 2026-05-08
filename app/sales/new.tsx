@@ -34,6 +34,9 @@ export default function NewSaleScreen() {
   const [showNewClient, setShowNewClient] = useState(false);
   const [newClientName, setNewClientName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [clientSearch, setClientSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+  const [isPaid, setIsPaid] = useState(false);
 
   const selectedClient = state.clients.find(c => c.id === selectedClientId);
 
@@ -128,7 +131,8 @@ export default function NewSaleScreen() {
     try {
       const isCredit = paymentType === 'credit_card';
       const count = isCredit ? 1 : installmentsCount;
-      const saleStatus = isCredit ? 'paid' as const : 'pending' as const;
+      const markAsPaid = isPaid || isCredit;
+      const saleStatus = markAsPaid ? 'paid' as const : 'pending' as const;
 
       let installments;
       if (entryVal > 0 && count > 1) {
@@ -138,12 +142,12 @@ export default function NewSaleScreen() {
       } else {
         installments = [{
             ...generateInstallments(totalAmount, 1, firstInstallmentDate)[0],
-            status: isCredit ? 'paid' as const : 'pending' as const,
-            paidDate: isCredit ? new Date().toISOString() : null,
+            status: markAsPaid ? 'paid' as const : 'pending' as const,
+            paidDate: markAsPaid ? new Date().toISOString() : null,
             history: [{
               date: new Date().toISOString(),
-              status: isCredit ? 'paid' as const : 'pending' as const,
-              notes: isCredit ? 'Pago - Cartão de Crédito' : 'Parcela criada',
+              status: markAsPaid ? 'paid' as const : 'pending' as const,
+              notes: markAsPaid ? 'Pago' : 'Parcela criada',
             }],
           }];
       }
@@ -409,6 +413,17 @@ export default function NewSaleScreen() {
               )}
             </View>
           )}
+
+          {/* Opção "Já pago" para parcela única não-crédito */}
+          {paymentType !== 'credit_card' && installmentsCount === 1 && (
+            <Pressable
+              onPress={() => setIsPaid(!isPaid)}
+              style={[styles.paymentOption, { borderColor: colors.border, alignSelf: 'flex-start', marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }, isPaid && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+            >
+              <MaterialIcons name={isPaid ? 'check-box' : 'check-box-outline-blank'} size={20} color={isPaid ? '#fff' : colors.muted} />
+              <Text style={[styles.paymentText, { color: isPaid ? '#fff' : colors.foreground }]}>Venda já paga</Text>
+            </Pressable>
+          )}
         </View>
 
         {/* Tags */}
@@ -438,12 +453,19 @@ export default function NewSaleScreen() {
         <Pressable style={styles.overlay} onPress={() => setShowClientPicker(false)}>
           <View style={[styles.pickerSheet, { backgroundColor: colors.surface }]}>
             <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Selecionar Cliente</Text>
+            <TextInput
+              style={[styles.searchInput, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
+              placeholder="Buscar cliente..."
+              placeholderTextColor={colors.muted}
+              value={clientSearch}
+              onChangeText={setClientSearch}
+            />
             <FlatList
-              data={state.clients}
+              data={state.clients.filter(c => !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase()))}
               keyExtractor={c => c.id}
               renderItem={({ item }) => (
                 <Pressable
-                  onPress={() => { setSelectedClientId(item.id); setShowClientPicker(false); }}
+                  onPress={() => { setSelectedClientId(item.id); setShowClientPicker(false); setClientSearch(''); }}
                   style={({ pressed }) => [styles.pickerItem, { borderBottomColor: colors.border }, pressed && { backgroundColor: colors.background }]}
                 >
                   <Text style={[styles.pickerItemText, { color: colors.foreground }]}>{item.name}</Text>
@@ -451,18 +473,26 @@ export default function NewSaleScreen() {
                 </Pressable>
               )}
               style={{ maxHeight: 300 }}
+              keyboardShouldPersistTaps="handled"
             />
           </View>
         </Pressable>
       </Modal>
 
       {/* Picker de produto */}
-      <Modal visible={showProductPicker} transparent animationType="slide" onRequestClose={() => setShowProductPicker(false)}>
+      <Modal visible={showProductPicker}  transparent animationType="slide" onRequestClose={() => setShowProductPicker(false)}>
         <Pressable style={styles.overlay} onPress={() => setShowProductPicker(false)}>
           <View style={[styles.pickerSheet, { backgroundColor: colors.surface }]}>
             <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Adicionar Produto</Text>
+            <TextInput
+              style={[styles.searchInput, { color: colors.foreground, backgroundColor: colors.background, borderColor: colors.border }]}
+              placeholder="Buscar produto..."
+              placeholderTextColor={colors.muted}
+              value={productSearch}
+              onChangeText={setProductSearch}
+            />
             <FlatList
-              data={state.products.filter(p => p.stock > 1)}
+              data={state.products.filter(p => p.stock > 0 && (!productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())))}
               keyExtractor={p => p.id}
               renderItem={({ item }) => (
                 <Pressable
@@ -473,7 +503,8 @@ export default function NewSaleScreen() {
                   <Text style={[styles.pickerItemSub, { color: colors.primary }]}>{formatCurrency(item.salePrice)}</Text>
                 </Pressable>
               )}
-              style={{ maxHeight: 300 }}
+              style={{maxHeight: 500}}
+              keyboardShouldPersistTaps="handled"
             />
           </View>
         </Pressable>
@@ -553,12 +584,13 @@ const styles = StyleSheet.create({
   saveBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16, borderRadius: 14, marginTop: 8 },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  pickerSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
+  pickerSheet: {  borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 32 },
   sheetTitle: { fontSize: 18, fontWeight: '700', marginBottom: 12 },
   pickerItem: { paddingVertical: 14, borderBottomWidth: 0.5, gap: 2 },
   pickerItemText: { fontSize: 15, fontWeight: '500' },
   pickerItemSub: { fontSize: 13 },
   sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#475569', alignSelf: 'center', marginBottom: 12 },
+  searchInput: { fontSize: 14, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, marginBottom: 12 },
   discountToggle: { flexDirection: 'row', gap: 8, paddingHorizontal: 14, paddingVertical: 10 },
   discountBtn: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 8, borderRadius: 8, borderWidth: 1 },
   discountBtnText: { fontSize: 13, fontWeight: '600' },

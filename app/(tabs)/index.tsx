@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
   View, Text, FlatList, TextInput, Pressable, StyleSheet,
-  ScrollView, Animated, PanResponder, Dimensions
+  ScrollView, Animated, PanResponder, Dimensions, Modal
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -11,10 +11,10 @@ import { TagChip } from '@/components/ui/TagChip';
 import { useApp } from '@/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
 import {
-  formatCurrency, formatDate, getMonthName, isInMonth,
-  getPaymentTypeLabel, getSaleStatusColor
+  formatCurrency, formatDate, getMonthName, isInMonth, getSaleStatusColor,
+  getPaymentTypeLabel
 } from '@/lib/utils';
-import { SummaryItem } from '@/types';
+import { SummaryItem, PaymentType } from '@/types';
 import * as Haptics from 'expo-haptics';
 import { Platform } from 'react-native';
 
@@ -31,6 +31,20 @@ export default function HomeScreen() {
   const [search, setSearch] = useState('');
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | 'received' | 'pending'>('all');
+  const [showFilters, setShowFilters] = useState(false);
+  const [showSort, setShowSort] = useState(false);
+  const [filterPayment, setFilterPayment] = useState<PaymentType | 'all'>('all');
+  const [sortBy, setSortBy] = useState<'date' | 'amount_asc' | 'amount_desc'>('date');
+
+  const PAYMENT_TYPES: { value: PaymentType | 'all'; label: string }[] = [
+    { value: 'all', label: 'Todos' },
+    { value: 'cash', label: 'Dinheiro' },
+    { value: 'pix', label: 'PIX' },
+    { value: 'credit_card', label: 'Crédito' },
+    { value: 'debit_card', label: 'Débito' },
+  ];
+
+  const hasFilters = filterPayment !== 'all' || statusFilter !== 'all';
 
   const translateX = useRef(new Animated.Value(0)).current;
 
@@ -88,7 +102,7 @@ export default function HomeScreen() {
       } else {
         // Vendas parceladas - cada parcela aparece no seu mês de vencimento
         sale.installments.forEach(inst => {
-          if (isInMonth(inst.dueDate, currentYear, currentMonth)) {
+          if ((inst.status === 'paid' ?  isInMonth(inst.paidDate as string, currentYear, currentMonth) :  isInMonth(inst.dueDate, currentYear, currentMonth))) {
             items.push({
               id: inst.id,
               type: 'installment',
@@ -102,14 +116,19 @@ export default function HomeScreen() {
               status: inst.status,
               paymentType: sale.paymentType,
               tagIds: sale.tagIds,
-              installmentInfo: { number: inst.number, total: inst.totalInstallments },
+              installmentInfo: { 
+                number: inst.number, 
+                total: inst.totalInstallments,
+                isEntry: sale.entryAmount ? inst.number === 0 : undefined,
+                entryPaymentType: sale.entryPaymentType, 
+              },
             });
           }
         });
       }
     });
 
-    return items.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+    return items;
   }, [state.sales, currentYear, currentMonth]);
 
   // Totais do mês
@@ -127,7 +146,7 @@ export default function HomeScreen() {
     return state.tags.filter(t => tagIds.has(t.id));
   }, [summaryItems, state.tags]);
 
-  // Filtrar itens por pesquisa, tag e status
+  // Filtrar itens por pesquisa, tag, status, pagamento e ordenação
   const filteredItems = useMemo(() => {
     let result = summaryItems;
 
@@ -135,6 +154,10 @@ export default function HomeScreen() {
       result = result.filter(item => item.status === 'paid');
     } else if (statusFilter === 'pending') {
       result = result.filter(item => item.status !== 'paid');
+    }
+
+    if (filterPayment !== 'all') {
+      result = result.filter(item => item.paymentType === filterPayment);
     }
 
     if (activeTagFilter) {
@@ -155,15 +178,23 @@ export default function HomeScreen() {
       });
     }
 
+    // Ordenação
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'amount_asc': return a.amount - b.amount;
+        case 'amount_desc': return b.amount - a.amount;
+        default: return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+      }
+    });
+
     return result;
-  }, [summaryItems, search, activeTagFilter, statusFilter, state.tags]);
+  }, [summaryItems, search, activeTagFilter, statusFilter, filterPayment, sortBy, state.tags]);
 
   const isCurrentMonth = currentYear === now.getFullYear() && currentMonth === now.getMonth();
 
   const renderItem = ({ item }: { item: SummaryItem }) => {
     const itemTags = state.tags.filter(t => item.tagIds.includes(t.id));
     const isOverdue = item.status !== 'paid' && new Date(item.dueDate) < new Date();
-
     return (
       <Pressable
         onPress={() => router.push(`/sales/${item.saleId}` as any)}
@@ -188,9 +219,11 @@ export default function HomeScreen() {
             <Text style={[styles.itemTitle, { color: colors.foreground }]} numberOfLines={1}>
               {item.title}
               {item.installmentInfo && (
-                <Text style={[styles.installmentBadge, { color: colors.muted }]}>
-                  {' '}({item.installmentInfo.number}/{item.installmentInfo.total})
-                </Text>
+                <>
+                  <Text style={[styles.installmentBadge, { color: colors.muted }]}>
+                    {' '}({item.installmentInfo.isEntry ? `Entrada · ${getPaymentTypeLabel(item.installmentInfo.entryPaymentType || item.paymentType)}` : `${item.installmentInfo.number}/${item.installmentInfo.total}`})
+                  </Text>
+                </>
               )}
             </Text>
             <Text style={[styles.itemAmount, { color: colors.foreground }]}>{formatCurrency(item.amount)}</Text>
@@ -201,7 +234,7 @@ export default function HomeScreen() {
                 <Text style={[styles.itemMetaText, { color: colors.muted }]} numberOfLines={1}>{item.clientName}</Text>
               )}
               <Text style={[styles.itemMetaText, { color: isOverdue ? '#DC2626' : colors.muted }]}>
-                {formatDate(item.dueDate)}
+                {formatDate(item.dueDate)} {item.paidDate ? ` | Pago: ${formatDate(item.paidDate)}` : ''}
               </Text>
             </View>
             {item.type === 'installment'
@@ -261,23 +294,50 @@ export default function HomeScreen() {
 
       {/* Barra de pesquisa */}
       <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <View style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
-          <MaterialIcons name="search" size={18} color={colors.muted} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.foreground }]}
-            placeholder="Buscar por título, cliente ou tag..."
-            placeholderTextColor={colors.muted}
-            value={search}
-            onChangeText={setSearch}
-            returnKeyType="search"
-          />
-          {search.length > 0 && (
-            <Pressable onPress={() => setSearch('')}>
-              <MaterialIcons name="close" size={16} color={colors.muted} />
-            </Pressable>
-          )}
+        <View style={[styles.searchRow]}>
+          <View style={[styles.searchBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <MaterialIcons name="search" size={18} color={colors.muted} />
+            <TextInput
+              style={[styles.searchInput, { color: colors.foreground }]}
+              placeholder="Buscar por título, cliente ou tag..."
+              placeholderTextColor={colors.muted}
+              value={search}
+              onChangeText={setSearch}
+              returnKeyType="search"
+            />
+            {search.length > 0 && (
+              <Pressable onPress={() => setSearch('')}>
+                <MaterialIcons name="close" size={16} color={colors.muted} />
+              </Pressable>
+            )}
+          </View>
+          <Pressable onPress={() => setShowSort(true)} style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.6 }]}>
+            <MaterialIcons name="sort" size={20} color={colors.muted} />
+          </Pressable>
+          <Pressable onPress={() => setShowFilters(true)} style={({ pressed }) => [styles.filterBtn, pressed && { opacity: 0.6 }]}>
+            <MaterialIcons name="filter-list" size={20} color={hasFilters ? colors.primary : colors.muted} />
+            {hasFilters && <View style={[styles.filterDot, { backgroundColor: colors.primary }]} />}
+          </Pressable>
         </View>
       </View>
+
+      {/* Chips de filtros ativos */}
+      {hasFilters && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.activeFilters} contentContainerStyle={{ paddingHorizontal: 16, gap: 8, paddingVertical: 6 }}>
+          {filterPayment !== 'all' && (
+            <Pressable onPress={() => setFilterPayment('all')} style={[styles.filterChip, { backgroundColor: colors.primary }]}>
+              <Text style={styles.filterChipText}>{getPaymentTypeLabel(filterPayment)}</Text>
+              <MaterialIcons name="close" size={14} color="#fff" />
+            </Pressable>
+          )}
+          {statusFilter !== 'all' && (
+            <Pressable onPress={() => setStatusFilter('all')} style={[styles.filterChip, { backgroundColor: '#D97706' }]}>
+              <Text style={styles.filterChipText}>{statusFilter === 'received' ? 'Recebido' : 'Pendente'}</Text>
+              <MaterialIcons name="close" size={14} color="#fff" />
+            </Pressable>
+          )}
+        </ScrollView>
+      )}
 
       {/* Chips de tags do mês */}
       {monthTags.length > 0 && (
@@ -335,6 +395,73 @@ export default function HomeScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
+
+      {/* Modal de filtros */}
+      <Modal visible={showFilters} transparent animationType="slide" onRequestClose={() => setShowFilters(false)}>
+        <Pressable style={styles.overlay} onPress={() => setShowFilters(false)}>
+          <View style={[styles.filterSheet, { backgroundColor: colors.surface }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Filtros</Text>
+
+            <Text style={[styles.filterLabel, { color: colors.muted }]}>Tipo de Pagamento</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {PAYMENT_TYPES.map(pt => (
+                <Pressable
+                  key={pt.value}
+                  onPress={() => setFilterPayment(pt.value)}
+                  style={[styles.filterOption, { borderColor: '#334155' }, filterPayment === pt.value && { backgroundColor: colors.primary, borderColor: colors.primary }]}
+                >
+                  <Text style={[styles.filterOptionText, { color: filterPayment === pt.value ? '#fff' : colors.foreground }]}>{pt.label}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+
+            <View style={styles.sheetActions}>
+              <Pressable
+                onPress={() => { setFilterPayment('all'); setStatusFilter('all'); }}
+                style={[styles.sheetBtn, { backgroundColor: colors.background }]}
+              >
+                <Text style={[styles.sheetBtnText, { color: colors.muted }]}>Limpar</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setShowFilters(false)}
+                style={[styles.sheetBtn, { backgroundColor: colors.primary }]}
+              >
+                <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Aplicar</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Pressable>
+      </Modal>
+
+      {/* Modal de ordenação */}
+      <Modal visible={showSort} transparent animationType="slide" onRequestClose={() => setShowSort(false)}>
+        <Pressable style={styles.overlay} onPress={() => setShowSort(false)}>
+          <View style={[styles.filterSheet, { backgroundColor: colors.surface }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Ordenar</Text>
+            <View style={styles.sortOptions}>
+              {[
+                { value: 'date' as const, label: 'Data' },
+                { value: 'amount_desc' as const, label: 'Maior valor' },
+                { value: 'amount_asc' as const, label: 'Menor valor' },
+              ].map(option => (
+                <Pressable
+                  key={option.value}
+                  onPress={() => { setSortBy(option.value); setShowSort(false); }}
+                  style={[styles.sortOption, { borderColor: '#334155' }, sortBy === option.value && { backgroundColor: colors.primary + '20', borderColor: colors.primary }]}
+                >
+                  <Text style={[styles.sortOptionText, { color: sortBy === option.value ? colors.primary : colors.foreground }]}>{option.label}</Text>
+                  {sortBy === option.value && <MaterialIcons name="check" size={20} color={colors.primary} />}
+                </Pressable>
+              ))}
+            </View>
+            <Pressable onPress={() => setShowSort(false)} style={[styles.sheetBtn, { backgroundColor: colors.primary }]}>
+              <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Fechar</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </ScreenContainer>
   );
 }
@@ -364,7 +491,9 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.3 },
   totalValue: { fontSize: 18, fontWeight: '700' },
   searchContainer: { paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 0.5 },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   searchBar: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
@@ -374,6 +503,25 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
   },
   searchInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
+  headerBtn: { padding: 8, borderRadius: 8 },
+  filterBtn: { padding: 8, borderRadius: 8, position: 'relative' },
+  filterDot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4 },
+  activeFilters: { maxHeight: 44 },
+  filterChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20 },
+  filterChipText: { color: '#fff', fontSize: 12, fontWeight: '600' },
+  filterLabel: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 },
+  filterOption: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1 },
+  filterOptionText: { fontSize: 13, fontWeight: '500' },
+  filterSheet: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 14, paddingBottom: 32 },
+  sheetHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: '#475569', alignSelf: 'center', marginBottom: 4 },
+  sheetTitle: { fontSize: 18, fontWeight: '700' },
+  sheetActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  sheetBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
+  sheetBtnText: { fontSize: 15, fontWeight: '600' },
+  sortOptions: { gap: 8 },
+  sortOption: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 14, borderRadius: 10, borderWidth: 1 },
+  sortOptionText: { fontSize: 15, fontWeight: '500' },
+  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   tagsScroll: { maxHeight: 44, borderBottomWidth: 0.5 },
   tagsScrollContent: { paddingHorizontal: 16, paddingVertical: 8, gap: 8, alignItems: 'center' },
   allChip: {

@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import { PaymentType, SaleStatus, InstallmentStatus } from "@/types";
+import { PaymentType, SaleStatus, InstallmentStatus, StockMovementType } from "@/types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -189,6 +189,17 @@ export function generateInstallmentsWithEntry(
   }
 
   return installments;
+}
+
+// Label do tipo de movimentação de estoque
+export function getMovementTypeLabel(type: StockMovementType): string {
+  const labels: Record<StockMovementType, string> = {
+    in: 'Entrada',
+    out: 'Saída',
+    initial: 'Estoque Inicial',
+    adjustment: 'Ajuste',
+  };
+  return labels[type] || type;
 }
 
 // Gera parcelas automaticamente
