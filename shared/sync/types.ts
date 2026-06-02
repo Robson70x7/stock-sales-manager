@@ -24,16 +24,35 @@ export interface SyncConflict {
 }
 
 export interface SyncState {
-  status: 'idle' | 'syncing' | 'connected' | 'error';
+  status: 'idle' | 'syncing' | 'connected' | 'error' | 'reconnecting';
   strategy: SyncStrategy;
   lastSync: number;
   conflicts: SyncConflict[];
   devices: SyncDevice[];
   error?: string;
+  desktopDeviceId?: string;
+  lastSyncTimestamp?: string;
+}
+
+// Desktop sync protocol message types
+export type DesktopSyncMessageType = 'handshake' | 'handshake_ack' | 'pull' | 'pull_result' | 'sale' | 'ack';
+
+export interface DesktopSyncMessage {
+  type: DesktopSyncMessageType;
+  version?: string;
+  deviceId?: string;
+  entity?: 'products' | 'clients' | 'tags' | 'suppliers';
+  since?: string;
+  data?: any;
+  timestamp?: string;
+  saleId?: string;
+  status?: 'ok' | 'error';
+  warnings?: Array<{ productId: string; productName: string; available: number; quantity: number }>;
+  message?: string;
 }
 
 export interface SyncMessage {
-  type: 'sync-request' | 'sync-response' | 'sync-update' | 'conflict' | 'heartbeat';
+  type: 'sync-request' | 'sync-response' | 'sync-update' | 'conflict' | 'heartbeat' | DesktopSyncMessageType;
   deviceId: string;
   timestamp: number;
   data?: any;

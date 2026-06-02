@@ -132,6 +132,7 @@ export function generateInstallments(
         status: 'pending' as const,
         notes: 'Parcela criada',
       }],
+      type: 'normal' as const,
     };
   });
 }

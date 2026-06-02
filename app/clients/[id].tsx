@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, FlatList } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -42,6 +42,13 @@ export default function ClientDetailScreen() {
           </View>
           <Text style={[styles.clientName, { color: colors.foreground }]}>{client.name}</Text>
           {client.document && <Text style={[styles.document, { color: colors.muted }]}>{client.document}</Text>}
+          {client.tagIds.length > 0 && (
+            <View style={styles.tagsRow}>
+              {state.tags.filter(t => client.tagIds.includes(t.id)).map(tag => (
+                <TagChip key={tag.id} tag={tag} small />
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Contato */}
@@ -113,16 +120,16 @@ export default function ClientDetailScreen() {
           </View>
         )}
 
+        <View style={[styles.infoCard, { backgroundColor: '#1E3A5F', borderColor: '#3B82F6' }]}>
+          <MaterialIcons name="desktop-mac" size={16} color="#3B82F6" />
+          <Text style={{ color: '#93C5FD', fontSize: 13, flex: 1 }}>
+            Gerenciar no Desktop — Os dados de clientes são sincronizados do sistema desktop
+          </Text>
+        </View>
+
         <Text style={[styles.dateText, { color: colors.muted }]}>Cadastrado em {formatDate(client.createdAt)}</Text>
 
         <View style={styles.actions}>
-          <Pressable
-            onPress={() => router.push(`/clients/edit/${client.id}` as any)}
-            style={({ pressed }) => [styles.editBtn, { backgroundColor: colors.primary }, pressed && { opacity: 0.8 }]}
-          >
-            <MaterialIcons name="edit" size={18} color="#fff" />
-            <Text style={styles.editBtnText}>Editar</Text>
-          </Pressable>
           <Pressable
             onPress={() => setShowDelete(true)}
             style={({ pressed }) => [styles.deleteBtn, { borderColor: '#DC2626' }, pressed && { opacity: 0.7 }]}
@@ -160,6 +167,7 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   infoText: { fontSize: 14, flex: 1 },
   noInfo: { fontSize: 13 },
+  syncStatusCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 0.5 },
   notesText: { fontSize: 14, lineHeight: 20 },
   statsGrid: { flexDirection: 'row', gap: 10 },
   statCard: { flex: 1, borderRadius: 12, padding: 14, borderWidth: 0.5, gap: 4 },

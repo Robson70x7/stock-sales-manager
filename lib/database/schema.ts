@@ -28,7 +28,37 @@ export const migrations: Migration[] = [
     "version": 5,
     "name": "entry_payment_type",
     "sql": "-- ============================================================\n-- Migration: Add entryPaymentType to sales\n-- Version: 005\n-- Date: 2026-05-08\n-- ============================================================\n\nALTER TABLE sales ADD COLUMN entryPaymentType TEXT;"
+  },
+  {
+    "version": 6,
+    "name": "sync_columns",
+    "sql": "-- ============================================================\n-- Migration: Add sync columns to sales table\n-- Version: 006\n-- Date: 2026-06-02\n-- Purpose: Add syncStatus, syncError, syncWarnings columns for sale ingestion sync\n-- ============================================================\n\nALTER TABLE sales ADD COLUMN syncStatus TEXT DEFAULT 'pending';\nALTER TABLE sales ADD COLUMN syncError TEXT;\nALTER TABLE sales ADD COLUMN syncWarnings TEXT;"
+  },
+  {
+    "version": 7,
+    "name": "entity_alignment",
+    "sql": "-- ============================================================\n-- Migration: Alinhamento de entidades com desktop\n-- Version: 007\n-- Date: 2026-06-02\n-- Purpose: Add averageCost to products, create product_tags, client_tags, suppliers, add unitCost/totalCost to stock_movements\n-- ============================================================\n\n-- Add averageCost to products\nALTER TABLE products ADD COLUMN averageCost REAL NOT NULL DEFAULT 0;\n\n-- Junction table: product <-> tag\nCREATE TABLE IF NOT EXISTS product_tags (\n  productId TEXT NOT NULL,\n  tagId TEXT NOT NULL,\n  PRIMARY KEY (productId, tagId),\n  FOREIGN KEY (productId) REFERENCES products(id) ON DELETE CASCADE,\n  FOREIGN KEY (tagId) REFERENCES tags(id) ON DELETE CASCADE\n);\n\n-- Junction table: client <-> tag\nCREATE TABLE IF NOT EXISTS client_tags (\n  clientId TEXT NOT NULL,\n  tagId TEXT NOT NULL,\n  PRIMARY KEY (clientId, tagId),\n  FOREIGN KEY (clientId) REFERENCES clients(id) ON DELETE CASCADE,\n  FOREIGN KEY (tagId) REFERENCES tags(id) ON DELETE CASCADE\n);\n\n-- Suppliers table (matching desktop schema)\nCREATE TABLE IF NOT EXISTS suppliers (\n  id TEXT PRIMARY KEY NOT NULL,\n  name TEXT NOT NULL,\n  phone TEXT,\n  email TEXT,\n  notes TEXT,\n  website TEXT,\n  pix TEXT,\n  address TEXT,\n  createdAt TEXT NOT NULL,\n  updatedAt TEXT NOT NULL,\n  isDeleted INTEGER NOT NULL DEFAULT 0\n);\n\n-- Add unitCost and totalCost to stock_movements for averageCost calculation\nALTER TABLE stock_movements ADD COLUMN unitCost REAL;\nALTER TABLE stock_movements ADD COLUMN totalCost REAL;"
+  },
+  {
+    "version": 8,
+    "name": "suppliers_extended",
+    "sql": "-- ============================================================\n-- Migration: Supplier fields (already created in v7)\n-- Version: 008\n-- Date: 2026-06-02\n-- Purpose: No-op - suppliers already created in v7 with all fields\n-- ============================================================\n\n-- Suppliers already created in v7 with website, pix, address"
+  },
+  {
+    "version": 9,
+    "name": "sale_items_uuid",
+    "sql": "-- ============================================================\n-- Migration: Add UUID to sale_items and migrate PK\n-- Version: 009\n-- Date: 2026-06-02\n-- Purpose: Ensure sale_items uses UUID for compatibility with desktop\n-- ============================================================\n\n-- Since expo-sqlite has limited ALTER support, add uuid column and populate\n-- The id column is already TEXT (UUID-compatible), so no structural PK change needed.\n-- This migration is a no-op placeholder to maintain version alignment.\n-- Sale items already use TEXT id via generateId() in toDbSaleItem."
+  },
+  {
+    "version": 10,
+    "name": "sale_items_cost_profit",
+    "sql": "-- ============================================================\n-- Migration: Add cost/profit fields to sale_items\n-- Version: 010\n-- Date: 2026-06-02\n-- Purpose: Add costAtSale, profitAmount, status columns\n-- ============================================================\n\nALTER TABLE sale_items ADD COLUMN costAtSale REAL;\nALTER TABLE sale_items ADD COLUMN profitAmount REAL;\nALTER TABLE sale_items ADD COLUMN status TEXT NOT NULL DEFAULT 'active';"
+  },
+  {
+    "version": 11,
+    "name": "installment_type",
+    "sql": "-- ============================================================\n-- Migration: Add type to installments\n-- Version: 011\n-- Date: 2026-06-02\n-- Purpose: Add type column ('normal' | 'entry') for compatibility with desktop\n-- ============================================================\n\nALTER TABLE installments ADD COLUMN type TEXT NOT NULL DEFAULT 'normal';"
   }
 ];
 
-export const LATEST_VERSION = 5;
+export const LATEST_VERSION = 11;

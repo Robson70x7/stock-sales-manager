@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useApp } from '@/context/AppContext';
@@ -10,7 +10,6 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { formatCurrency, formatDate, getPaymentTypeLabel } from '@/lib/utils';
 import { Installment } from '@/types';
 import * as Haptics from 'expo-haptics';
-import { Platform } from 'react-native';
 
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -118,14 +117,54 @@ export default function SaleDetailScreen() {
           </View>
         </View>
 
+        {/* Sync Status */}
+        {sale.syncStatus && sale.syncStatus !== 'synced' && (
+          <View style={[styles.syncStatusCard, { backgroundColor: sale.syncStatus === 'failed' ? '#7f1d1d' : '#1E3A5F', borderColor: sale.syncStatus === 'failed' ? '#ef4444' : '#3B82F6' }]}>
+            <MaterialIcons
+              name={sale.syncStatus === 'failed' ? 'error' : 'sync'}
+              size={16}
+              color={sale.syncStatus === 'failed' ? '#fca5a5' : '#93C5FD'}
+            />
+            <Text style={{ color: sale.syncStatus === 'failed' ? '#fca5a5' : '#93C5FD', fontSize: 13, flex: 1 }}>
+              {sale.syncStatus === 'pending' ? 'Aguardando sincronização com o Desktop' : 'Falha na sincronização'}
+            </Text>
+          </View>
+        )}
+
+        {/* Over-sell warnings */}
+        {sale.syncWarnings && sale.syncWarnings.length > 0 && (
+          <View style={[styles.card, { backgroundColor: '#7f1d1d', borderColor: '#ef4444' }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <MaterialIcons name="warning" size={18} color="#fca5a5" />
+              <Text style={[styles.cardTitle, { color: '#fca5a5' }]}>Warnings de Estoque</Text>
+            </View>
+            {sale.syncWarnings.map((w, idx) => (
+              <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4, borderTopWidth: idx > 0 ? 0.5 : 0, borderTopColor: '#ef444440' }}>
+                <Text style={{ color: '#fca5a5', fontSize: 13, flex: 1 }}>{w.productName}</Text>
+                <Text style={{ color: '#fca5a5', fontSize: 13 }}>
+                  Disponível: {w.available} / Solicitado: {w.quantity}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
+
         {/* Produtos */}
         {sale.items.length > 0 && (
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.cardTitle, { color: colors.foreground }]}>Produtos</Text>
             {sale.items.map((item, idx) => (
-              <View key={item.productId} style={[styles.itemRow, idx > 0 && { borderTopWidth: 0.5, borderTopColor: colors.border }]}>
-                <Text style={[styles.itemName, { color: colors.foreground }]}>{item.productName}</Text>
-                <Text style={[styles.itemQty, { color: colors.muted }]}>{item.quantity}x {formatCurrency(item.unitPrice)}</Text>
+              <View key={item.productId || item.id} style={[styles.itemRow, idx > 0 && { borderTopWidth: 0.5, borderTopColor: colors.border }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.itemName, { color: colors.foreground }]}>{item.productName}</Text>
+                  <Text style={[styles.itemQty, { color: colors.muted }]}>{item.quantity}x {formatCurrency(item.unitPrice)}</Text>
+                  {item.costAtSale != null && (
+                    <Text style={[styles.itemQty, { color: colors.muted }]}>
+                      Lucro: {formatCurrency(item.profitAmount ?? 0)}
+                    </Text>
+                  )}
+                </View>
+                <Text style={[styles.itemTotal, { color: colors.foreground }]}>{formatCurrency(item.totalPrice)}</Text>
               </View>
             ))}
           </View>
@@ -234,6 +273,7 @@ const styles = StyleSheet.create({
   dateText: { fontSize: 13 },
   description: { fontSize: 14, lineHeight: 20 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  syncStatusCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 0.5 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   statCard: { flex: 1, minWidth: '45%', borderRadius: 12, padding: 14, borderWidth: 0.5, gap: 4 },
   statLabel: { fontSize: 12 },

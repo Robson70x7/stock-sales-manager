@@ -74,9 +74,11 @@ export default function NewProductScreen() {
         description: description.trim() || undefined,
         costPrice: parsePrice(costPrice),
         salePrice: parsePrice(salePrice),
+        averageCost: 0,
         stock: 0,
         unit: unit.trim() || 'un',
         photoUri: persistedPhotoUri || undefined,
+        tagIds: [],
       });
 
       const initStockValue = parseInt(initStock || '0');

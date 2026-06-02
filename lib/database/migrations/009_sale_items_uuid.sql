@@ -1,0 +1,11 @@
+-- ============================================================
+-- Migration: Add UUID to sale_items and migrate PK
+-- Version: 009
+-- Date: 2026-06-02
+-- Purpose: Ensure sale_items uses UUID for compatibility with desktop
+-- ============================================================
+
+-- Since expo-sqlite has limited ALTER support, add uuid column and populate
+-- The id column is already TEXT (UUID-compatible), so no structural PK change needed.
+-- This migration is a no-op placeholder to maintain version alignment.
+-- Sale items already use TEXT id via generateId() in toDbSaleItem.

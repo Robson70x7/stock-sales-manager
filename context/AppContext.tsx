@@ -176,6 +176,7 @@ function toDbProduct(product: Product): db.DbProduct {
     costPrice: product.costPrice,
     salePrice: product.salePrice,
     stock: product.stock,
+    averageCost: product.averageCost ?? 0,
     unit: product.unit || null,
     photoUri: product.photoUri || null,
     createdAt: product.createdAt,
@@ -192,8 +193,10 @@ function fromDbProduct(row: db.DbProduct): Product {
     costPrice: row.costPrice,
     salePrice: row.salePrice,
     stock: row.stock,
+    averageCost: row.averageCost ?? 0,
     unit: row.unit || undefined,
     photoUri: row.photoUri || undefined,
+    tagIds: [],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -222,6 +225,7 @@ function fromDbClient(row: db.DbClient): Client {
     email: row.email || undefined,
     address: row.address || undefined,
     notes: row.notes || undefined,
+    tagIds: [],
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -247,6 +251,9 @@ function toDbSale(sale: Sale): db.DbSale {
     tagIds: JSON.stringify(sale.tagIds),
     createdAt: sale.createdAt,
     updatedAt: sale.updatedAt,
+    syncStatus: sale.syncStatus || null,
+    syncError: sale.syncError || null,
+    syncWarnings: sale.syncWarnings ? JSON.stringify(sale.syncWarnings) : null,
   };
 }
 
@@ -257,11 +264,15 @@ function fromDbSale(row: db.DbSale, items: db.DbSaleItem[], installments: db.DbI
         clientId: row.clientId || undefined,
         clientName: row.clientName || undefined,
         items: items.map(i => ({
+          id: i.id,
           productId: i.productId,
           productName: i.productName,
           quantity: i.quantity,
           unitPrice: i.unitPrice,
           totalPrice: i.totalPrice,
+          costAtSale: i.costAtSale ?? undefined,
+          profitAmount: i.profitAmount ?? undefined,
+          status: (i.status as SaleItem['status']) || 'active',
         })),
         subtotal: row.subtotal,
         discountType: row.discountType as Sale['discountType'] || null,
@@ -282,24 +293,31 @@ function fromDbSale(row: db.DbSale, items: db.DbSaleItem[], installments: db.DbI
           paidDate: inst.paidDate || undefined,
           status: inst.status as Installment['status'],
           history: JSON.parse(inst.history || '[]'),
+          type: (inst.type as Installment['type']) || 'normal',
         })),
         tagIds: JSON.parse(row.tagIds || '[]'),
         saleDate: row.saleDate,
         firstInstallmentDate: row.firstInstallmentDate || undefined,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
+        syncStatus: (row.syncStatus as Sale['syncStatus']) || undefined,
+        syncError: row.syncError || undefined,
+        syncWarnings: row.syncWarnings ? JSON.parse(row.syncWarnings) : undefined,
       };
 }
 
 function toDbSaleItem(item: SaleItem, saleId: string): db.DbSaleItem {
   return {
-    id: generateId(),
+    id: item.id || generateId(),
     saleId,
     productId: item.productId,
     productName: item.productName,
     quantity: item.quantity,
     unitPrice: item.unitPrice,
     totalPrice: item.totalPrice,
+    costAtSale: item.costAtSale ?? null,
+    profitAmount: item.profitAmount ?? null,
+    status: item.status || 'active',
   };
 }
 
@@ -314,6 +332,7 @@ function toDbInstallment(inst: Installment): db.DbInstallment {
     paidDate: inst.paidDate || null,
     status: inst.status,
     history: JSON.stringify(inst.history),
+    type: inst.type || 'normal',
   };
 }
 
@@ -348,12 +367,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         })
       );
 
+      // Load tags for products and clients
+      const productsWithTags = await Promise.all(
+        dbProducts.map(async (p) => {
+          const tagIds = await db.getProductTags(p.id);
+          const product = fromDbProduct(p);
+          product.tagIds = tagIds;
+          return product;
+        })
+      );
+
+      const clientsWithTags = await Promise.all(
+        dbClients.map(async (c) => {
+          const tagIds = await db.getClientTags(c.id);
+          const client = fromDbClient(c);
+          client.tagIds = tagIds;
+          return client;
+        })
+      );
+
       dispatch({
         type: 'LOAD_DATA',
         payload: {
           tags: dbTags.map(fromDbTag),
-          products: dbProducts.map(fromDbProduct),
-          clients: dbClients.map(fromDbClient),
+          products: productsWithTags,
+          clients: clientsWithTags,
           sales,
           settings: dbSettings['app_settings'] 
             ? JSON.parse(dbSettings['app_settings']) 
@@ -448,7 +486,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       notes: movement.notes || null,
       createdAt: movement.createdAt,
       isDeleted: 0,
+      unitCost: movementData.type === 'in' ? (movementData as any).unitCost ?? null : null,
+      totalCost: movementData.type === 'in' ? (movementData as any).totalCost ?? null : null,
     });
+
+    // Update averageCost for 'in' movements
+    if (movementData.type === 'in') {
+      await db.updateAverageCost(movement.productId);
+    }
 
     const newStock = await db.getProductStock(movement.productId);
     dispatch({ type: 'UPDATE_PRODUCT_STOCK', payload: { productId: movement.productId, stock: newStock } });
@@ -463,16 +508,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const now = new Date().toISOString();
     const id = generateId();
     
+    // Calculate costAtSale and profitAmount per item
+    const itemsWithCost = await Promise.all(
+      saleData.items.map(async (item) => {
+        const { averageCost } = await db.getProductStockWithCost(item.productId);
+        const costAtSale = item.quantity * averageCost;
+        const profitAmount = item.totalPrice - costAtSale;
+        return {
+          ...item,
+          costAtSale,
+          profitAmount,
+          status: 'active' as const,
+          id: generateId(),
+        };
+      })
+    );
+
     const sale: Sale = {
       ...saleData,
+      items: itemsWithCost,
       id,
       createdAt: now,
       updatedAt: now,
+      syncStatus: 'pending',
     };
 
     await db.saveSale(toDbSale(sale));
 
-    // Salvar itens
+    // Salvar itens com custo/lucro
     sale.items = sale.items.map(item => ({ ...item, saleId: sale.id }));
     for (const item of sale.items) {
       await db.saveSaleItem(toDbSaleItem(item, sale.id));
@@ -484,8 +547,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await db.saveInstallment(toDbInstallment(inst));
     }
 
-    // Criar stock_movements para cada item (type='out')
+    // Criar stock_movements para cada item (type='out') com unitCost/totalCost
     for (const item of sale.items) {
+      const { averageCost } = await db.getProductStockWithCost(item.productId);
       const movement: StockMovement = {
         id: generateId(),
         productId: item.productId,
@@ -504,6 +568,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         notes: movement.notes || null,
         createdAt: movement.createdAt,
         isDeleted: 0,
+        unitCost: averageCost,
+        totalCost: averageCost * item.quantity,
       });
 
       // Atualizar cache de estoque local

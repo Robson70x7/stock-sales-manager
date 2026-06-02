@@ -7,7 +7,7 @@ import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { formatCurrency, formatDate, getMovementTypeLabel } from '@/lib/utils';
-import { getStockMovementsByProduct, DbStockMovement } from '@/lib/database/db';
+import { getStockMovementsByProduct, DbStockMovement, getProductTags } from '@/lib/database/db';
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -19,9 +19,11 @@ export default function ProductDetailScreen() {
   const [entryQuantity, setEntryQuantity] = useState('1');
   const [entryNotes, setEntryNotes] = useState('');
   const [movements, setMovements] = useState<DbStockMovement[]>([]);
+  const [productTagIds, setProductTagIds] = useState<string[]>([]);
 
   useEffect(() => {
     getStockMovementsByProduct(id).then(setMovements);
+    getProductTags(id).then(setProductTagIds);
   }, [id]);
 
   const product = state.products.find(p => p.id === id);
@@ -32,7 +34,7 @@ export default function ProductDetailScreen() {
   );
 
   const stockColor = product.stock <= 0 ? '#DC2626' : product.stock <= 5 ? '#D97706' : '#16A34A';
-  const margin = product.costPrice > 0 ? ((product.salePrice - product.costPrice) / product.costPrice * 100).toFixed(1) : null;
+  const margin = product.averageCost > 0 ? ((product.salePrice - product.averageCost) / product.averageCost * 100).toFixed(1) : null;
 
   const handleDelete = async () => {
     await deleteProduct(product.id);
@@ -69,12 +71,23 @@ export default function ProductDetailScreen() {
           <Text style={[styles.productName, { color: colors.foreground }]}>{product.name}</Text>
           {product.category && <Text style={[styles.category, { color: colors.muted }]}>{product.category}</Text>}
           {product.description && <Text style={[styles.description, { color: colors.muted }]}>{product.description}</Text>}
+          {productTagIds.length > 0 && (
+            <View style={styles.tagsRow}>
+              {state.tags.filter(t => productTagIds.includes(t.id)).map(tag => (
+                <TagChip key={tag.id} tag={tag} small />
+              ))}
+            </View>
+          )}
         </View>
 
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.statLabel, { color: colors.muted }]}>Preço de Venda</Text>
             <Text style={[styles.statValue, { color: colors.primary }]}>{formatCurrency(product.salePrice)}</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.statLabel, { color: colors.muted }]}>Custo Médio</Text>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{formatCurrency(product.averageCost)}</Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={[styles.statLabel, { color: colors.muted }]}>Preço de Custo</Text>
@@ -92,6 +105,13 @@ export default function ProductDetailScreen() {
               <Text style={[styles.statValue, { color: '#16A34A' }]}>{margin}%</Text>
             </View>
           )}
+        </View>
+
+        <View style={[styles.infoCard, { backgroundColor: '#1E3A5F', borderColor: '#3B82F6' }]}>
+          <MaterialIcons name="desktop-mac" size={16} color="#3B82F6" />
+          <Text style={{ color: '#93C5FD', fontSize: 13, flex: 1 }}>
+            Gerenciar no Desktop — Os dados de produtos são sincronizados do sistema desktop
+          </Text>
         </View>
 
         <Text style={[styles.dateText, { color: colors.muted }]}>Cadastrado em {formatDate(product.createdAt)}</Text>
@@ -137,13 +157,7 @@ export default function ProductDetailScreen() {
             <MaterialIcons name="add-circle" size={18} color="#fff" />
             <Text style={styles.editBtnText}>Entrada</Text>
           </Pressable>
-          <Pressable
-            onPress={() => router.push(`/products/edit/${product.id}` as any)}
-            style={({ pressed }) => [styles.editBtn, { backgroundColor: colors.primary }, pressed && { opacity: 0.8 }]}
-          >
-            <MaterialIcons name="edit" size={18} color="#fff" />
-            <Text style={styles.editBtnText}>Editar</Text>
-          </Pressable>
+
           <Pressable
             onPress={() => setShowDelete(true)}
             style={({ pressed }) => [styles.deleteBtn, { borderColor: '#DC2626' }, pressed && { opacity: 0.7 }]}
@@ -249,6 +263,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, fontSize: 14, textAlign: 'right' },
   card: { borderRadius: 12, padding: 14, borderWidth: 0.5, gap: 10 },
   cardTitle: { fontSize: 14, fontWeight: '700' },
+  infoCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 0.5 },
   divider: { height: 0.5 },
   movementRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   movementDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },

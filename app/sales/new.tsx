@@ -149,6 +149,7 @@ export default function NewSaleScreen() {
               status: markAsPaid ? 'paid' as const : 'pending' as const,
               notes: markAsPaid ? 'Pago' : 'Parcela criada',
             }],
+            type: 'normal' as const,
           }];
       }
 
@@ -533,7 +534,7 @@ export default function NewSaleScreen() {
                       Alert.alert('Atencao', 'Informe o nome do cliente.');
                       return;
                     }
-                    const newClient = await addClient({ name: newClientName.trim() });
+                    const newClient = await addClient({ name: newClientName.trim(), tagIds: [] });
                     setSelectedClientId(newClient.id);
                     setNewClientName('');
                     setShowNewClient(false);

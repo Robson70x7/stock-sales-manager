@@ -37,6 +37,7 @@ const handleSave = async () => {
         email: email.trim() || undefined,
         address: address.trim() || undefined,
         notes: notes.trim() || undefined,
+        tagIds: [],
       });
       router.back();
     } catch (error) {

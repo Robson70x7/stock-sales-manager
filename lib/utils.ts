@@ -165,6 +165,7 @@ export function generateInstallmentsWithEntry(
       status: 'paid' as const,
       notes: 'Entrada',
     }],
+    type: 'entry',
   });
 
   // Demais parcelas
@@ -185,6 +186,7 @@ export function generateInstallmentsWithEntry(
         status: 'pending' as const,
         notes: 'Parcela criada',
       }],
+      type: 'normal',
     });
   }
 
@@ -233,6 +235,7 @@ export function generateInstallments(
         status: 'pending' as const,
         notes: 'Parcela criada',
       }],
+      type: 'normal' as const,
     };
   });
 }

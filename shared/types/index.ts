@@ -6,6 +6,9 @@ export type PaymentType = 'cash' | 'pix' | 'credit_card' | 'debit_card';
 export type SaleStatus = 'pending' | 'partial' | 'paid' | 'cancelled';
 export type InstallmentStatus = 'pending' | 'paid' | 'overdue';
 export type StockMovementType = 'in' | 'out' | 'initial' | 'adjustment';
+export type SaleSyncStatus = 'pending' | 'synced' | 'failed';
+export type SaleItemStatus = 'active' | 'cancelled';
+export type InstallmentType = 'normal' | 'entry';
 
 export interface Tag {
   id: string;
@@ -22,8 +25,10 @@ export interface Product {
   costPrice: number;
   salePrice: number;
   stock: number;
+  averageCost: number;
   unit?: string;
   photoUri?: string;
+  tagIds: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -36,16 +41,34 @@ export interface Client {
   email?: string;
   address?: string;
   notes?: string;
+  tagIds: string[];
   createdAt: string;
   updatedAt: string;
 }
 
 export interface SaleItem {
+  id?: string;
   productId: string;
   productName: string;
   quantity: number;
   unitPrice: number;
   totalPrice: number;
+  costAtSale?: number;
+  profitAmount?: number;
+  status?: SaleItemStatus;
+}
+
+export interface Supplier {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  notes?: string;
+  website?: string;
+  pix?: string;
+  address?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface InstallmentHistory {
@@ -64,6 +87,7 @@ export interface Installment {
   paidDate?: string | null;
   status: InstallmentStatus;
   history: InstallmentHistory[];
+  type: InstallmentType;
 }
 
 export interface Sale {
@@ -87,6 +111,9 @@ export interface Sale {
   firstInstallmentDate?: string;
   createdAt: string;
   updatedAt: string;
+  syncStatus?: SaleSyncStatus;
+  syncError?: string;
+  syncWarnings?: Array<{ productId: string; productName: string; available: number; quantity: number }>;
 }
 
 export interface StockMovement {
@@ -129,6 +156,7 @@ export interface SummaryItem {
     isEntry?: boolean;
     entryPaymentType?: PaymentType;
   };
+  syncStatus?: SaleSyncStatus;
 }
 
 // Filtros de vendas
