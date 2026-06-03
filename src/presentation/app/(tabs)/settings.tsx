@@ -111,10 +111,11 @@ export default function SettingsScreen() {
 
     let lastError: Error | null = null;
     const maxRetries = 3;
+    let result: Awaited<ReturnType<typeof syncManager.syncAll>> | undefined;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        await syncManager.syncAll();
+        result = await syncManager.syncAll();
         lastError = null;
         break;
       } catch (err) {
@@ -134,6 +135,7 @@ export default function SettingsScreen() {
     if (lastError) throw lastError;
 
     await queryClient.invalidateQueries();
+    return result;
   }, [syncManager, syncStatus]);
 
   const handleToggleAskReturnStock = async (value: boolean) => {

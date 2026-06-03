@@ -19,11 +19,19 @@ interface SyncDevice {
   ip?: string;
 }
 
+interface SyncResult {
+  products: number;
+  clients: number;
+  tags: number;
+  suppliers: number;
+  sales: number;
+}
+
 interface SyncModalProps {
   visible: boolean;
   onClose: () => void;
   onConnect: (deviceId: string) => Promise<void>;
-  onSync: () => Promise<void>;
+  onSync: () => Promise<SyncResult | void>;
   onScan: () => Promise<void>;
   devices: SyncDevice[];
   connected: boolean;
@@ -47,6 +55,7 @@ export function SyncModal({
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
 
   useEffect(() => {
     if (!visible) {
@@ -54,6 +63,7 @@ export function SyncModal({
       setScanning(false);
       setConnecting(false);
       setSyncing(false);
+      setSyncResult(null);
     }
   }, [visible]);
 
@@ -88,9 +98,10 @@ export function SyncModal({
 
   const handleSync = async () => {
     setSyncing(true);
+    setSyncResult(null);
     try {
-      await onSync();
-      Alert.alert('Sucesso', 'Dados sincronizados com sucesso!');
+      const result = await onSync();
+      if (result) setSyncResult(result);
     } catch {
       Alert.alert('Erro', 'Falha ao sincronizar dados');
     } finally {
@@ -247,6 +258,40 @@ export function SyncModal({
               ))
             )}
           </View>
+
+          {/* Resultado */}
+          {syncResult && (
+            <View style={[styles.resultCard, { backgroundColor: colors.surface }]}>
+              <View style={styles.resultHeader}>
+                <MaterialIcons name="check-circle" size={20} color="#10b981" />
+                <Text style={[styles.resultTitle, { color: '#10b981' }]}>
+                  Sincronização concluída
+                </Text>
+              </View>
+              <View style={styles.resultBody}>
+                <View style={styles.resultRow}>
+                  <Text style={[styles.resultLabel, { color: colors.muted }]}>Produtos</Text>
+                  <Text style={[styles.resultValue, { color: colors.foreground }]}>{syncResult.products}</Text>
+                </View>
+                <View style={styles.resultRow}>
+                  <Text style={[styles.resultLabel, { color: colors.muted }]}>Clientes</Text>
+                  <Text style={[styles.resultValue, { color: colors.foreground }]}>{syncResult.clients}</Text>
+                </View>
+                <View style={styles.resultRow}>
+                  <Text style={[styles.resultLabel, { color: colors.muted }]}>Tags</Text>
+                  <Text style={[styles.resultValue, { color: colors.foreground }]}>{syncResult.tags}</Text>
+                </View>
+                <View style={styles.resultRow}>
+                  <Text style={[styles.resultLabel, { color: colors.muted }]}>Fornecedores</Text>
+                  <Text style={[styles.resultValue, { color: colors.foreground }]}>{syncResult.suppliers}</Text>
+                </View>
+                <View style={[styles.resultRow, styles.resultRowLast]}>
+                  <Text style={[styles.resultLabel, { color: colors.muted }]}>Vendas enviadas</Text>
+                  <Text style={[styles.resultValue, { color: colors.foreground }]}>{syncResult.sales}</Text>
+                </View>
+              </View>
+            </View>
+          )}
 
           {/* Info */}
           <View style={[styles.infoCard, { backgroundColor: colors.surface }]}>
@@ -421,6 +466,43 @@ const styles = StyleSheet.create({
   deviceType: {
     fontSize: 12,
     marginTop: 2,
+  },
+  resultCard: {
+    padding: 12,
+    borderRadius: 8,
+  },
+  resultHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
+  },
+  resultTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  resultBody: {
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(128,128,128,0.3)',
+    paddingTop: 8,
+  },
+  resultRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+  },
+  resultRowLast: {
+    borderTopWidth: 0.5,
+    borderTopColor: 'rgba(128,128,128,0.3)',
+    marginTop: 4,
+    paddingTop: 10,
+  },
+  resultLabel: {
+    fontSize: 13,
+  },
+  resultValue: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   infoCard: {
     flexDirection: 'row',
