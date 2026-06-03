@@ -23,6 +23,7 @@ export function SqlConsole({ visible, onClose }: { visible: boolean; onClose: ()
   const [error, setError] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const inputRef = useRef<TextInput>(null);
+  
 
   const handleRun = async () => {
     if (!sql.trim()) return;
@@ -51,8 +52,22 @@ export function SqlConsole({ visible, onClose }: { visible: boolean; onClose: ()
       const db = await getDb();
 
       if (isReadOnlyQuery(query)) {
-        const rows = await db.getAllAsync(query);
-        setResult(formatResult(rows));
+        const MAX_ROWS = 200;
+        const rows: any[] = [];
+        let truncated = false;
+        for await (const row of db.getEachAsync(query)) {
+          if (rows.length >= MAX_ROWS) {
+            truncated = true;
+            break;
+          }
+          rows.push(row);
+        }
+        const label = truncated
+          ? `(mostrando ${MAX_ROWS} de ${MAX_ROWS}+ linhas)\n\n`
+          : rows.length === 0
+            ? '(0 linhas)\n\n'
+            : `(${rows.length} ${rows.length === 1 ? 'linha' : 'linhas'})\n\n`;
+        setResult(label + formatResult(rows));
       } else {
         const res = await db.runAsync(query);
         setResult(formatResult({
@@ -118,17 +133,17 @@ export function SqlConsole({ visible, onClose }: { visible: boolean; onClose: ()
           )}
 
           {result !== null && !error && (
-            <ScrollView style={[styles.resultCard, { backgroundColor: '#0C1F11', borderColor: '#16A34A' }]}>
+            <View style={[styles.resultCard, { backgroundColor: '#0C1F11', borderColor: '#16A34A' }]}>
               <View style={styles.resultHeader}>
                 <MaterialIcons name="check-circle" size={16} color="#16A34A" />
                 <Text style={[styles.resultLabel, { color: '#86EFAC' }]}>Resultado</Text>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator>
+              <ScrollView style={styles.resultScroll} horizontal showsHorizontalScrollIndicator>
                 <Text style={[styles.resultText, { color: '#D1FAE5' }]} selectable>
                   {result}
                 </Text>
               </ScrollView>
-            </ScrollView>
+            </View>
           )}
 
           {!result && !error && (
@@ -168,6 +183,7 @@ const styles = StyleSheet.create({
   runBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, marginHorizontal: 14, marginBottom: 14, borderRadius: 8 },
   runBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   resultCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
+  resultScroll: { maxHeight: 300 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   resultLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   errorText: { fontSize: 13, fontFamily: 'monospace', lineHeight: 18 },
