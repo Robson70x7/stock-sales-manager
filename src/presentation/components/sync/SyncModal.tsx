@@ -22,9 +22,11 @@ interface SyncDevice {
 interface SyncModalProps {
   visible: boolean;
   onClose: () => void;
-  onSync: (deviceId: string) => Promise<void>;
+  onConnect: (deviceId: string) => Promise<void>;
+  onSync: () => Promise<void>;
   onScan: () => Promise<void>;
   devices: SyncDevice[];
+  connected: boolean;
   syncStatus: 'idle' | 'syncing' | 'connected' | 'error';
   error?: string;
 }
@@ -32,14 +34,17 @@ interface SyncModalProps {
 export function SyncModal({
   visible,
   onClose,
+  onConnect,
   onSync,
   onScan,
   devices,
+  connected,
   syncStatus,
   error,
 }: SyncModalProps) {
   const colors = useColors();
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [scanning, setScanning] = useState(false);
 
@@ -47,6 +52,7 @@ export function SyncModal({
     if (!visible) {
       setSelectedDevice(null);
       setScanning(false);
+      setConnecting(false);
       setSyncing(false);
     }
   }, [visible]);
@@ -67,18 +73,25 @@ export function SyncModal({
     }
   };
 
-  const handleSync = async () => {
-    if (!selectedDevice) {
-      Alert.alert('Atenção', 'Selecione um dispositivo para sincronizar');
-      return;
-    }
+  const handleConnect = async () => {
+    if (!selectedDevice) return;
 
+    setConnecting(true);
     try {
-      setSyncing(true);
-      await onSync(selectedDevice);
+      await onConnect(selectedDevice);
+    } catch {
+      Alert.alert('Erro', 'Falha ao conectar com o dispositivo');
+    } finally {
+      setConnecting(false);
+    }
+  };
+
+  const handleSync = async () => {
+    setSyncing(true);
+    try {
+      await onSync();
       Alert.alert('Sucesso', 'Dados sincronizados com sucesso!');
-      setSelectedDevice(null);
-    } catch (err) {
+    } catch {
       Alert.alert('Erro', 'Falha ao sincronizar dados');
     } finally {
       setSyncing(false);
@@ -252,23 +265,43 @@ export function SyncModal({
           >
             <Text style={[styles.btnText, { color: colors.foreground }]}>Cancelar</Text>
           </Pressable>
-          <Pressable
-            onPress={handleSync}
-            disabled={!selectedDevice || syncing}
-            style={[
-              styles.btn,
-              {
-                backgroundColor: colors.primary,
-                opacity: !selectedDevice || syncing ? 0.5 : 1,
-              },
-            ]}
-          >
-            {syncing ? (
-              <ActivityIndicator size="small" color="white" />
-            ) : (
-              <Text style={[styles.btnText, { color: 'white' }]}>Sincronizar</Text>
-            )}
-          </Pressable>
+          {connected ? (
+            <Pressable
+              onPress={handleSync}
+              disabled={syncing}
+              style={[
+                styles.btn,
+                {
+                  backgroundColor: colors.primary,
+                  opacity: syncing ? 0.5 : 1,
+                },
+              ]}
+            >
+              {syncing ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={[styles.btnText, { color: 'white' }]}>Sincronizar</Text>
+              )}
+            </Pressable>
+          ) : (
+            <Pressable
+              onPress={handleConnect}
+              disabled={!selectedDevice || connecting}
+              style={[
+                styles.btn,
+                {
+                  backgroundColor: colors.primary,
+                  opacity: !selectedDevice || connecting ? 0.5 : 1,
+                },
+              ]}
+            >
+              {connecting ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={[styles.btnText, { color: 'white' }]}>Conectar</Text>
+              )}
+            </Pressable>
+          )}
         </View>
       </View>
     </Modal>

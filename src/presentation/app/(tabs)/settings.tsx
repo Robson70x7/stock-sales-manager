@@ -74,7 +74,7 @@ export default function SettingsScreen() {
     setSyncModalVisible(false);
   }, []);
 
-  const handleSync = useCallback(async (deviceId: string) => {
+  const handleConnect = useCallback(async (deviceId: string) => {
     const discovery = discoveryRef.current;
     if (!discovery) return;
 
@@ -93,7 +93,6 @@ export default function SettingsScreen() {
         const adapter = new LocalP2PSyncAdapter(deviceName, discovery);
         adapter.setDesktopIp(selectedDevice.ip);
         await syncManager.initialize(adapter);
-        await syncManager.syncAll();
         lastError = null;
         break;
       } catch (err) {
@@ -105,9 +104,37 @@ export default function SettingsScreen() {
     }
 
     if (lastError) throw lastError;
+  }, [syncManager, devices]);
+
+  const handleSync = useCallback(async () => {
+    if (syncStatus !== 'connected') return;
+
+    let lastError: Error | null = null;
+    const maxRetries = 3;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        await syncManager.syncAll();
+        lastError = null;
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt < maxRetries) {
+          await syncManager.disconnect();
+          const deviceName = await DeviceInfo.getDeviceName();
+          const discovery = discoveryRef.current;
+          if (discovery) {
+            const adapter = new LocalP2PSyncAdapter(deviceName, discovery);
+            await syncManager.initialize(adapter);
+          }
+        }
+      }
+    }
+
+    if (lastError) throw lastError;
 
     await queryClient.invalidateQueries();
-  }, [syncManager, devices]);
+  }, [syncManager, syncStatus]);
 
   const handleToggleAskReturnStock = async (value: boolean) => {
     await updateSettings({ askReturnStockOnDelete: value });
@@ -185,9 +212,11 @@ export default function SettingsScreen() {
       <SyncModal
         visible={syncModalVisible}
         onClose={handleCloseSync}
+        onConnect={handleConnect}
         onSync={handleSync}
         onScan={handleScanDevices}
         devices={devices}
+        connected={syncStatus === 'connected'}
         syncStatus={syncStatus === 'reconnecting' ? 'idle' : syncStatus}
         error={errorMsg}
       />
