@@ -37,9 +37,9 @@ export class SyncManager {
     });
 
     try {
-      this.updateState({ status: 'syncing' });
+      this.updateState({ status: 'syncing', error: undefined });
       await adapter.connect();
-      this.updateState({ status: 'connected' });
+      this.updateState({ status: 'connected', error: undefined });
     } catch (error) {
       this.updateState({
         status: 'error',
@@ -93,6 +93,7 @@ export class SyncManager {
       this.updateState({
         status: 'connected',
         lastSync: now,
+        error: undefined,
       });
       await saveSetting('last_sync_timestamp', now.toString());
     } catch (error) {
@@ -121,12 +122,13 @@ export class SyncManager {
     }
 
     try {
-      this.updateState({ status: 'syncing' });
+      this.updateState({ status: 'syncing', error: undefined });
       const result = await this.adapter.sync(data);
       const now = Date.now();
       this.updateState({
         status: 'connected',
         lastSync: now,
+        error: undefined,
       });
       try {
         await saveSetting('last_sync_timestamp', now.toString());
