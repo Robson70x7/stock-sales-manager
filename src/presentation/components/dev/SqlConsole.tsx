@@ -5,10 +5,24 @@ import { useColors } from '@/hooks/use-colors';
 import { getDb } from '@infra/database/db';
 
 const DANGEROUS_KEYWORDS = ['INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER', 'CREATE', 'REINDEX', 'REPLACE', 'TRUNCATE', 'VACUUM'];
+const HEAVY_COLUMNS = new Set(['photoUri', 'photo', 'image', 'imageUri']);
 
 function isReadOnlyQuery(sql: string): boolean {
   const trimmed = sql.trim().toUpperCase();
   return !DANGEROUS_KEYWORDS.some(kw => trimmed.startsWith(kw));
+}
+
+function stripHeavyColumns(rows: any[]): any[] {
+  return rows.map(row => {
+    if (!row || typeof row !== 'object') return row;
+    const cleaned: Record<string, any> = {};
+    for (const key of Object.keys(row)) {
+      if (!HEAVY_COLUMNS.has(key)) {
+        cleaned[key] = row[key];
+      }
+    }
+    return cleaned;
+  });
 }
 
 function formatResult(data: any): string {
@@ -52,22 +66,12 @@ export function SqlConsole({ visible, onClose }: { visible: boolean; onClose: ()
       const db = await getDb();
 
       if (isReadOnlyQuery(query)) {
-        const MAX_ROWS = 200;
-        const rows: any[] = [];
-        let truncated = false;
-        for await (const row of db.getEachAsync(query)) {
-          if (rows.length >= MAX_ROWS) {
-            truncated = true;
-            break;
-          }
-          rows.push(row);
-        }
-        const label = truncated
-          ? `(mostrando ${MAX_ROWS} de ${MAX_ROWS}+ linhas)\n\n`
-          : rows.length === 0
-            ? '(0 linhas)\n\n'
-            : `(${rows.length} ${rows.length === 1 ? 'linha' : 'linhas'})\n\n`;
-        setResult(label + formatResult(rows));
+        const rows = await db.getAllAsync(query);
+        const cleaned = stripHeavyColumns(rows);
+        const label = cleaned.length === 0
+          ? '(0 linhas)\n\n'
+          : `(${cleaned.length} ${cleaned.length === 1 ? 'linha' : 'linhas'})\n\n`;
+        setResult(label + formatResult(cleaned));
       } else {
         const res = await db.runAsync(query);
         setResult(formatResult({
@@ -138,7 +142,7 @@ export function SqlConsole({ visible, onClose }: { visible: boolean; onClose: ()
                 <MaterialIcons name="check-circle" size={16} color="#16A34A" />
                 <Text style={[styles.resultLabel, { color: '#86EFAC' }]}>Resultado</Text>
               </View>
-              <ScrollView style={styles.resultScroll} horizontal showsHorizontalScrollIndicator>
+              <ScrollView horizontal showsHorizontalScrollIndicator>
                 <Text style={[styles.resultText, { color: '#D1FAE5' }]} selectable>
                   {result}
                 </Text>
@@ -183,7 +187,6 @@ const styles = StyleSheet.create({
   runBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, marginHorizontal: 14, marginBottom: 14, borderRadius: 8 },
   runBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   resultCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
-  resultScroll: { maxHeight: 300 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   resultLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   errorText: { fontSize: 13, fontFamily: 'monospace', lineHeight: 18 },
