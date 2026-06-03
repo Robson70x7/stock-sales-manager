@@ -10,6 +10,7 @@ import { SyncModal } from '@/components/sync/SyncModal';
 import { SyncDevice } from '@shared/sync/types';
 import { DeviceInfo } from 'react-native-device-info';
 import { queryClient } from '@shared/lib/query-client';
+import { SqlConsole } from '@/components/dev/SqlConsole';
 
 export default function SettingsScreen() {
   const { state, updateSettings } = useApp();
@@ -22,7 +23,10 @@ export default function SettingsScreen() {
   const [deviceCount, setDeviceCount] = useState(0);
   const [desktopConnected, setDesktopConnected] = useState(false);
   const [syncModalVisible, setSyncModalVisible] = useState(false);
+  const [sqlConsoleVisible, setSqlConsoleVisible] = useState(false);
 
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const discoveryRef = useRef<DeviceDiscoveryService | null>(null);
 
   useEffect(() => {
@@ -138,15 +142,36 @@ export default function SettingsScreen() {
     return result;
   }, [syncManager, syncStatus]);
 
+  const handleHeaderTap = useCallback(() => {
+    tapCountRef.current += 1;
+
+    if (tapTimerRef.current) {
+      clearTimeout(tapTimerRef.current);
+    }
+
+    if (tapCountRef.current >= 5) {
+      tapCountRef.current = 0;
+      setSqlConsoleVisible(true);
+      return;
+    }
+
+    tapTimerRef.current = setTimeout(() => {
+      tapCountRef.current = 0;
+    }, 2000);
+  }, []);
+
   const handleToggleAskReturnStock = async (value: boolean) => {
     await updateSettings({ askReturnStockOnDelete: value });
   };
 
   return (
     <ScreenContainer containerClassName="bg-background">
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      <Pressable
+        onPress={handleHeaderTap}
+        style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
+      >
         <Text style={[styles.title, { color: colors.foreground }]}>Configurações</Text>
-      </View>
+      </Pressable>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
@@ -221,6 +246,11 @@ export default function SettingsScreen() {
         connected={syncStatus === 'connected'}
         syncStatus={syncStatus === 'reconnecting' ? 'idle' : syncStatus}
         error={errorMsg}
+      />
+
+      <SqlConsole
+        visible={sqlConsoleVisible}
+        onClose={() => setSqlConsoleVisible(false)}
       />
     </ScreenContainer>
   );
