@@ -142,7 +142,7 @@ export function SqlConsole({ visible, onClose }: { visible: boolean; onClose: ()
                 <MaterialIcons name="check-circle" size={16} color="#16A34A" />
                 <Text style={[styles.resultLabel, { color: '#86EFAC' }]}>Resultado</Text>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator>
+              <ScrollView horizontal showsHorizontalScrollIndicator style={styles.resultScroll}>
                 <Text style={[styles.resultText, { color: '#D1FAE5' }]} selectable>
                   {result}
                 </Text>
@@ -187,6 +187,7 @@ const styles = StyleSheet.create({
   runBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 12, marginHorizontal: 14, marginBottom: 14, borderRadius: 8 },
   runBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
   resultCard: { borderRadius: 12, borderWidth: 1, padding: 14 },
+  resultScroll: { height: 200, flexGrow: 0 },
   resultHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
   resultLabel: { fontSize: 12, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
   errorText: { fontSize: 13, fontFamily: 'monospace', lineHeight: 18 },
