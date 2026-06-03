@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateInstallments, isInMonth } from '../lib/utils';
+import { generateInstallments, isInMonth } from '../src/shared/lib/utils';
 
 describe('Installments', () => {
   it('should generate installments with correct due dates', () => {

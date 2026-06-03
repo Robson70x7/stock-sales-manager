@@ -37,7 +37,9 @@ const config: ExpoConfig = {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Permitir acesso à galeria de fotos para adicionar imagens de produtos",
         "NSCameraUsageDescription": "Permitir acesso à câmera para capturar fotos de produtos",
-        "NSPhotoLibraryAddUsageDescription": "Permitir salvar fotos na galeria"
+        "NSPhotoLibraryAddUsageDescription": "Permitir salvar fotos na galeria",
+        "NSLocalNetworkUsageDescription": "Permitir $(PRODUCT_NAME) encontrar e conectar ao desktop VendaFácil na rede local",
+        "NSBonjourServices": ["_vendafacil._tcp"]
       }
   },
   android: {
@@ -54,7 +56,10 @@ const config: ExpoConfig = {
       "POST_NOTIFICATIONS",
       "READ_EXTERNAL_STORAGE",
       "WRITE_EXTERNAL_STORAGE",
-      "CAMERA"
+      "CAMERA",
+      "CHANGE_WIFI_MULTICAST_STATE",
+      "ACCESS_WIFI_STATE",
+      "ACCESS_NETWORK_STATE"
     ],
     intentFilters: [
       {
@@ -76,7 +81,12 @@ const config: ExpoConfig = {
     favicon: "./assets/images/favicon.png",
   },
   plugins: [
-    "expo-router",
+    [
+      "expo-router",
+      {
+        "root": "./src/presentation/app"
+      }
+    ],
     "expo-sqlite",
     "expo-web-browser",
     [

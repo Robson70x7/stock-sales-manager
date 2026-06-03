@@ -12,7 +12,7 @@ import {
   isInMonth,
   getInitials,
   TAG_COLORS,
-} from '../lib/utils';
+} from '../src/shared/lib/utils';
 
 // ============================================================
 // formatCurrency

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { generateId, generateInstallments } from '../lib/utils';
+import { generateId, generateInstallments } from '../src/shared/lib/utils';
 
 describe('Atomic Sale Save', () => {
   it('should generate valid UUIDs', () => {

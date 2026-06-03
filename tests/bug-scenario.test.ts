@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateInstallments, isInMonth } from '../lib/utils';
+import { generateInstallments, isInMonth } from '../src/shared/lib/utils';
 
 describe('Bug Scenario: Sale disappears when switching months', () => {
   it('should show sale with 3 installments in all 3 months', () => {

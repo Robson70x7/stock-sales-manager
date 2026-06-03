@@ -16,7 +16,7 @@ const tailwindColors = Object.fromEntries(
 module.exports = {
   darkMode: "class",
   // Scan all component and app files for Tailwind classes
-  content: ["./app/**/*.{js,ts,tsx}", "./components/**/*.{js,ts,tsx}", "./lib/**/*.{js,ts,tsx}", "./hooks/**/*.{js,ts,tsx}"],
+  content: ["./src/presentation/app/**/*.{js,ts,tsx}", "./src/presentation/components/**/*.{js,ts,tsx}", "./src/shared/**/*.{js,ts,tsx}", "./src/presentation/hooks/**/*.{js,ts,tsx}", "./src/domain/**/*.{js,ts,tsx}", "./src/application/**/*.{js,ts,tsx}", "./src/infra/**/*.{js,ts,tsx}"],
 
   presets: [require("nativewind/preset")],
   theme: {

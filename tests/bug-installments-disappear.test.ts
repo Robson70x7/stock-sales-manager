@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { generateInstallments, isInMonth } from '../lib/utils';
+import { generateInstallments, isInMonth } from '../src/shared/lib/utils';
 
 describe('Bug: Installments disappear when switching months', () => {
   it('should show installments in all their respective months', () => {

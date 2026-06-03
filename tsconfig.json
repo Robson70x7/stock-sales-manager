@@ -8,10 +8,19 @@
     ],
     "paths": {
       "@/*": [
-        "./*"
+        "./src/presentation/*"
+      ],
+      "@domain/*": [
+        "./src/domain/*"
+      ],
+      "@application/*": [
+        "./src/application/*"
+      ],
+      "@infra/*": [
+        "./src/infra/*"
       ],
       "@shared/*": [
-        "./shared/*"
+        "./src/shared/*"
       ]
     }
   },

@@ -1,0 +1,166 @@
+import React from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
+import { useColors } from '@/hooks/use-colors';
+import { TagChip } from '@/components/ui/TagChip';
+import { SaleStatusBadge } from '@/components/ui/StatusBadge';
+import { formatCurrency, formatDate, getInitials } from '@shared/lib/utils';
+import { useClient } from '@/hooks/useClient';
+import { useAllSales } from '@/hooks/useAllSales';
+import { useTags } from '@/hooks/useTags';
+
+export default function ClientDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const colors = useColors();
+  const router = useRouter();
+
+  const { data: client, isLoading } = useClient(id);
+  const { data: sales = [] } = useAllSales();
+  const { data: tags = [] } = useTags();
+
+  if (isLoading) return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: colors.muted }}>Carregando...</Text>
+    </View>
+  );
+
+  if (!client) return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: colors.muted }}>Cliente não encontrado</Text>
+    </View>
+  );
+
+  const clientSales = sales.filter(s => s.clientId === id);
+  const totalSpent = clientSales.filter(s => s.status !== 'cancelled').reduce((sum, s) => sum + s.totalAmount, 0);
+  const initials = getInitials(client.name);
+
+  return (
+    <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.content}>
+        {/* Hero */}
+        <View style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.avatar, { backgroundColor: colors.primary + '20' }]}>
+            <Text style={[styles.avatarText, { color: colors.primary }]}>{initials}</Text>
+          </View>
+          <Text style={[styles.clientName, { color: colors.foreground }]}>{client.name}</Text>
+          {client.document && <Text style={[styles.document, { color: colors.muted }]}>{client.document}</Text>}
+          {client.tagIds.length > 0 && (
+            <View style={styles.tagsRow}>
+              {tags.filter(t => client.tagIds.includes(t.id)).map(tag => (
+                <TagChip key={tag.id} tag={tag} small />
+              ))}
+            </View>
+          )}
+        </View>
+
+        {/* Contato */}
+        <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Text style={[styles.cardTitle, { color: colors.foreground }]}>Contato</Text>
+          {client.phone && (
+            <View style={styles.infoRow}>
+              <MaterialIcons name="phone" size={16} color={colors.muted} />
+              <Text style={[styles.infoText, { color: colors.foreground }]}>{client.phone}</Text>
+            </View>
+          )}
+          {client.email && (
+            <View style={styles.infoRow}>
+              <MaterialIcons name="email" size={16} color={colors.muted} />
+              <Text style={[styles.infoText, { color: colors.foreground }]}>{client.email}</Text>
+            </View>
+          )}
+          {client.address && (
+            <View style={styles.infoRow}>
+              <MaterialIcons name="place" size={16} color={colors.muted} />
+              <Text style={[styles.infoText, { color: colors.foreground }]}>{client.address}</Text>
+            </View>
+          )}
+          {!client.phone && !client.email && !client.address && (
+            <Text style={[styles.noInfo, { color: colors.muted }]}>Nenhum contato cadastrado</Text>
+          )}
+        </View>
+
+        {/* Resumo financeiro */}
+        <View style={styles.statsGrid}>
+          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.statLabel, { color: colors.muted }]}>Total em Compras</Text>
+            <Text style={[styles.statValue, { color: colors.primary }]}>{formatCurrency(totalSpent)}</Text>
+          </View>
+          <View style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.statLabel, { color: colors.muted }]}>Nº de Vendas</Text>
+            <Text style={[styles.statValue, { color: colors.foreground }]}>{clientSales.length}</Text>
+          </View>
+        </View>
+
+        {/* Notas */}
+        {client.notes && (
+          <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Observações</Text>
+            <Text style={[styles.notesText, { color: colors.muted }]}>{client.notes}</Text>
+          </View>
+        )}
+
+        {/* Histórico de compras */}
+        {clientSales.length > 0 && (
+          <View style={[styles.infoCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.cardTitle, { color: colors.foreground }]}>Histórico de Compras</Text>
+            {clientSales.slice(0, 5).map(sale => (
+              <Pressable
+                key={sale.id}
+                onPress={() => router.push(`/sales/${sale.id}` as any)}
+                style={({ pressed }) => [styles.saleRow, { borderTopColor: colors.border }, pressed && { opacity: 0.7 }]}
+              >
+                <View style={styles.saleInfo}>
+                  <Text style={[styles.saleTitle, { color: colors.foreground }]} numberOfLines={1}>{sale.items[0]?.productName || 'Venda'}</Text>
+                  <Text style={[styles.saleDate, { color: colors.muted }]}>{formatDate(sale.saleDate)}</Text>
+                </View>
+                <View style={styles.saleRight}>
+                  <Text style={[styles.saleAmount, { color: colors.foreground }]}>{formatCurrency(sale.totalAmount)}</Text>
+                  <SaleStatusBadge status={sale.status} small />
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        )}
+
+        <View style={[styles.infoCard, { backgroundColor: '#1E3A5F', borderColor: '#3B82F6' }]}>
+          <MaterialIcons name="desktop-mac" size={16} color="#3B82F6" />
+          <Text style={{ color: '#93C5FD', fontSize: 13, flex: 1 }}>
+            Gerenciar no Desktop — Os dados de clientes são sincronizados do sistema desktop
+          </Text>
+        </View>
+
+        <Text style={[styles.dateText, { color: colors.muted }]}>Cadastrado em {formatDate(client.createdAt)}</Text>
+      </View>
+    </ScrollView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  content: { padding: 16, gap: 16, paddingBottom: 40 },
+  heroCard: { borderRadius: 16, padding: 20, alignItems: 'center', gap: 8, borderWidth: 0.5 },
+  avatar: { width: 72, height: 72, borderRadius: 36, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: 24, fontWeight: '700' },
+  clientName: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
+  document: { fontSize: 13 },
+  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 4 },
+  infoCard: { borderRadius: 12, padding: 14, borderWidth: 0.5, gap: 10 },
+  cardTitle: { fontSize: 14, fontWeight: '700' },
+  infoRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  infoText: { fontSize: 14, flex: 1 },
+  noInfo: { fontSize: 13 },
+  syncStatusCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 0.5 },
+  notesText: { fontSize: 14, lineHeight: 20 },
+  statsGrid: { flexDirection: 'row', gap: 10 },
+  statCard: { flex: 1, borderRadius: 12, padding: 14, borderWidth: 0.5, gap: 4 },
+  statLabel: { fontSize: 12 },
+  statValue: { fontSize: 18, fontWeight: '700' },
+  saleRow: { flexDirection: 'row', alignItems: 'center', paddingTop: 10, borderTopWidth: 0.5, gap: 10 },
+  saleInfo: { flex: 1 },
+  saleTitle: { fontSize: 14, fontWeight: '500' },
+  saleDate: { fontSize: 12, marginTop: 2 },
+  saleRight: { alignItems: 'flex-end', gap: 4 },
+  saleAmount: { fontSize: 14, fontWeight: '600' },
+  dateText: { fontSize: 12, textAlign: 'center' },
+});
