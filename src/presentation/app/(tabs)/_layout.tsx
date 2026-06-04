@@ -6,6 +6,7 @@ import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
 import { usePermissions } from "@shared/hooks/use-permissions";
 import { PERMISSIONS } from "@shared/auth/permissions";
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 
 export default function TabLayout() {
   const colors = useColors();
@@ -91,6 +92,15 @@ export default function TabLayout() {
           ...(can(PERMISSIONS.SETTINGS_MANAGE) ? {} : { href: null }),
         }}
       />
+      {!can(PERMISSIONS.SETTINGS_MANAGE) && (
+        <Tabs.Screen
+          name="logout"
+          options={{
+            title: "Sair",
+            tabBarIcon: ({ color }) => <MaterialIcons size={24} name="logout" color={color} />,
+          }}
+        />
+      )}
     </Tabs>
   );
 }

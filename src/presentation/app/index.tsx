@@ -10,7 +10,9 @@ export default function SplashScreen() {
     (async () => {
       const session = await AuthService.getSession();
       if (session) {
-        router.replace('/(tabs)' as any);
+        console.log(session);
+        const hasDashboard = session.permissions.includes('*') || session.permissions.includes('dashboard.view');
+        router.replace((hasDashboard ? '/(tabs)' : '/(tabs)/sales') as any);
       } else if (await AuthService.hasUsers()) {
         router.replace('/(auth)/login' as any);
       } else {

@@ -1,175 +1,134 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useCallback, useRef } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  TextInput,
-  Pressable,
-  StyleSheet,
-  ScrollView,
-  Animated,
-  Modal,
-  RefreshControl,
-  PanResponder,
-} from "react-native";
-import { useRouter } from "expo-router";
-import { MaterialIcons } from "@expo/vector-icons";
-import { ScreenContainer } from "@/components/screen-container";
-import { FAB } from "@/components/ui/FAB";
-import { EmptyState } from "@/components/ui/EmptyState";
-import { SaleStatusBadge } from "@/components/ui/StatusBadge";
-import { TagChip } from "@/components/ui/TagChip";
-import { useApp } from "@shared/context/AppContext";
-import { useColors } from "@/hooks/use-colors";
+  View, Text, FlatList, TextInput, Pressable, StyleSheet,
+  ScrollView, Animated, Modal, RefreshControl,
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import { MaterialIcons } from '@expo/vector-icons';
+import { ScreenContainer } from '@/components/screen-container';
+import { FAB } from '@/components/ui/FAB';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { SaleStatusBadge, InstallmentStatusBadge } from '@/components/ui/StatusBadge';
+import { TagChip } from '@/components/ui/TagChip';
+import { useColors } from '@/hooks/use-colors';
 import {
-  formatCurrency,
-  formatDate,
+  formatCurrency, formatDate, getMonthName, isInMonth, getSaleStatusColor,
   getPaymentTypeLabel,
-  getSaleStatusColor,
-  isInMonth
-} from "@shared/lib/utils";
-import { Sale, PaymentType, SaleStatus, SummaryItem } from "@shared/types";
+} from '@shared/lib/utils';
+import { SummaryItem, PaymentType } from '@shared/types';
+import { useSalesByMonth } from '@/hooks/useSalesByMonth';
+import { useTags } from '@/hooks/useTags';
 
-const PAYMENT_TYPES: { value: PaymentType | "all"; label: string }[] = [
-  { value: "all", label: "Todos" },
-  { value: "cash", label: "Dinheiro" },
-  { value: "pix", label: "PIX" },
-  { value: "credit_card", label: "Crédito" },
-  { value: "debit_card", label: "Débito" },
+type TabType = 'vendas' | 'a-receber';
+
+const PAYMENT_TYPES: { value: PaymentType | 'all'; label: string }[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'cash', label: 'Dinheiro' },
+  { value: 'pix', label: 'PIX' },
+  { value: 'credit_card', label: 'Crédito' },
+  { value: 'debit_card', label: 'Débito' },
 ];
 
-const STATUSES: { value: SaleStatus | "all"; label: string }[] = [
-  { value: "all", label: "Todos" },
-  { value: "pending", label: "Pendente" },
-  { value: "partial", label: "Parcial" },
-  { value: "paid", label: "Pago" },
-  { value: "cancelled", label: "Cancelado" },
+const STATUSES = [
+  { value: 'all' as const, label: 'Todos' },
+  { value: 'paid' as const, label: 'Pagos' },
+  { value: 'pending' as const, label: 'Pendentes' },
+  { value: 'overdue' as const, label: 'Vencidos' },
 ];
 
-type SortOption =
-  | "date_desc"
-  | "date_asc"
-  | "amount_desc"
-  | "amount_asc"
-  | "client_name";
+type SortOption = 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc' | 'client_name';
 
 const SORT_OPTIONS: { value: SortOption; label: string }[] = [
-  { value: "date_desc", label: "Mais recentes" },
-  { value: "date_asc", label: "Mais antigas" },
-  { value: "amount_desc", label: "Maior valor" },
-  { value: "amount_asc", label: "Menor valor" },
-  { value: "client_name", label: "Cliente" },
+  { value: 'date_desc', label: 'Mais recentes' },
+  { value: 'date_asc', label: 'Mais antigos' },
+  { value: 'amount_desc', label: 'Maior valor' },
+  { value: 'amount_asc', label: 'Menor valor' },
+  { value: 'client_name', label: 'Cliente' },
 ];
 
 const MONTHS = [
-  "Janeiro",
-  "Fevereiro",
-  "Março",
-  "Abril",
-  "Maio",
-  "Junho",
-  "Julho",
-  "Agosto",
-  "Setembro",
-  "Outubro",
-  "Novembro",
-  "Dezembro",
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
 ];
 
 export default function SalesScreen() {
-  const { state } = useApp();
   const colors = useColors();
   const router = useRouter();
-  const [search, setSearch] = useState("");
-  const [filterPayment, setFilterPayment] = useState<PaymentType | "all">(
-    "all",
-  );
-  const [filterStatus, setFilterStatus] = useState<SaleStatus | "all">("all");
+
+  const [activeTab, setActiveTab] = useState<TabType>('vendas');
+  const now = new Date();
+  const [currentYear, setCurrentYear] = useState(now.getFullYear());
+  const [currentMonth, setCurrentMonth] = useState(now.getMonth());
+  const [search, setSearch] = useState('');
+  const [filterPayment, setFilterPayment] = useState<PaymentType | 'all'>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('date_desc');
   const [showFilters, setShowFilters] = useState(false);
-  const [sortBy, setSortBy] = useState<SortOption>("date_desc");
   const [showSort, setShowSort] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
-  const today = new Date();
-  const [currentMonth, setCurrentMonth] = useState(today.getMonth());
-  const [currentYear, setCurrentYear] = useState(today.getFullYear());
+  const { data: monthSales = [], refetch } = useSalesByMonth(currentYear, currentMonth);
+  const { data: tags = [] } = useTags();
 
-   const translateX = useRef(new Animated.Value(0)).current;
-
-   const panResponder = useRef(
-      PanResponder.create({
-        onMoveShouldSetPanResponder: (_, gs) => Math.abs(gs.dx) > 20 && Math.abs(gs.dy) < 50,
-        onPanResponderRelease: (_, gs) => {
-          if (gs.dx < -50) handleNextMonth();
-          else if (gs.dx > 50) handlePrevMonth();
-        },
-      })
-    ).current;
-
-  const handlePrevMonth = () => {
+  const handlePrevMonth = useCallback(() => {
     if (currentMonth === 0) {
       setCurrentMonth(11);
-      setCurrentYear(currentYear - 1);
+      setCurrentYear(y => y - 1);
     } else {
-      setCurrentMonth(currentMonth - 1);
+      setCurrentMonth(m => m - 1);
     }
-  };
+  }, [currentMonth]);
 
-  const handleNextMonth = () => {
+  const handleNextMonth = useCallback(() => {
     if (currentMonth === 11) {
       setCurrentMonth(0);
-      setCurrentYear(currentYear + 1);
+      setCurrentYear(y => y + 1);
     } else {
-      setCurrentMonth(currentMonth + 1);
+      setCurrentMonth(m => m + 1);
     }
-  };
+  }, [currentMonth]);
 
-  // Verifica se uma venda tem parcelas no mês especificado
-  const hasParcelsInMonth = (
-    sale: Sale,
-    year: number,
-    month: number,
-  ): boolean => {
-    if (sale.installmentsCount <= 1) return false;
-    return sale.installments.some((inst) =>
-      isInMonth(inst.dueDate, year, month),
-    );
-  };
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await refetch();
+    setRefreshing(false);
+  }, [refetch]);
 
-  const filtered = useMemo((): SummaryItem[] => {
-    let result: SummaryItem[] = [];
+  // Gera SummaryItems a partir das vendas do mês
+  const summaryItems = useMemo((): SummaryItem[] => {
+    const items: SummaryItem[] = [];
 
-    // let result = [...state.sales]
-    //   .filter(s => isInMonth(s.saleDate, currentYear, currentMonth) || hasParcelsInMonth(s, currentYear, currentMonth));
-
-    state.sales.forEach((sale) => {
+    monthSales.forEach(sale => {
       if (sale.installmentsCount <= 1) {
-        // Venda simples - aparece no mês da data da venda
         if (isInMonth(sale.saleDate, currentYear, currentMonth)) {
-          result.push({
+          items.push({
             id: sale.id,
-            type: "sale",
+            type: 'sale',
             saleId: sale.id,
-            title: sale.items[0]?.productName || "Venda",
+            title: sale.items[0]?.productName || 'Venda',
             description: sale.description,
             clientName: sale.clientName,
             amount: sale.totalAmount,
             dueDate: sale.saleDate,
-            paidDate: sale.status === "paid" ? sale.saleDate : undefined,
+            paidDate: sale.status === 'paid' ? sale.saleDate : undefined,
             status: sale.status,
             paymentType: sale.paymentType,
             tagIds: sale.tagIds,
+            syncStatus: sale.syncStatus || null,
           });
         }
       } else {
-        // Vendas parceladas - cada parcela aparece no seu mês de vencimento
-        sale.installments.forEach((inst) => {
-          if (inst.status === 'paid' ? isInMonth(inst.paidDate as string, currentYear, currentMonth) : isInMonth(inst.dueDate, currentYear, currentMonth)) {
-            result.push({
+        sale.installments.forEach(inst => {
+          const showInMonth = inst.status === 'paid'
+            ? isInMonth(inst.paidDate as string, currentYear, currentMonth)
+            : isInMonth(inst.dueDate, currentYear, currentMonth);
+          if (showInMonth) {
+            items.push({
               id: inst.id,
-              type: "installment",
+              type: 'installment',
               saleId: sale.id,
-              title: sale.items[0]?.productName || "Venda",
+              title: sale.items[0]?.productName || 'Venda',
               description: sale.description,
               clientName: sale.clientName,
               amount: inst.amount,
@@ -190,152 +149,110 @@ export default function SalesScreen() {
       }
     });
 
-    // Apply sorting
-    result.sort((a, b) => {
-      switch (sortBy) {
-        case "date_desc":
-          return (
-            new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()
-          );
-        case "date_asc":
-          return (
-            new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime()
-          );
-        case "amount_desc":
-          return b.amount - a.amount;
-        case "amount_asc":
-          return a.amount - b.amount;
-        case "client_name":
-          return (a.clientName || "").localeCompare(b.clientName || "");
-        default:
-          return 0;
-      }
-    });
+    return items;
+  }, [monthSales, currentYear, currentMonth]);
 
-    if (search) {
+  // Filtra conforme a tab ativa
+  const tabFiltered = useMemo(() => {
+    if (activeTab === 'vendas') return summaryItems;
+    // "A Receber": só itens não pagos
+    return summaryItems.filter(i => i.status !== 'paid');
+  }, [summaryItems, activeTab]);
+
+  // Aplicar busca, filtros e ordenação
+  const filteredItems = useMemo(() => {
+    let result = tabFiltered;
+
+    if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter((s) =>
-          s.title.toLowerCase().includes(q) ||
-          s.description?.toLowerCase().includes(q) ||
-          s.clientName?.toLowerCase().includes(q) ||
-          state.tags
-            .filter((t) => s.tagIds.includes(t.id))
-            .some((t) => t.name.toLowerCase().includes(q))
+      result = result.filter(item =>
+        item.title.toLowerCase().includes(q) ||
+        item.description?.toLowerCase().includes(q) ||
+        item.clientName?.toLowerCase().includes(q) ||
+        tags.filter(t => item.tagIds.includes(t.id)).some(t => t.name.toLowerCase().includes(q))
       );
     }
 
-    if (filterPayment !== "all")
-      result = result.filter((s) => s.paymentType === filterPayment);
-    if (filterStatus !== "all")
-      result = result.filter((s) => s.status === filterStatus);
-    
+    if (filterPayment !== 'all') {
+      result = result.filter(i => i.paymentType === filterPayment);
+    }
+
+    if (filterStatus !== 'all') {
+      result = result.filter(i => i.status === filterStatus);
+    }
+
+    result.sort((a, b) => {
+      switch (sortBy) {
+        case 'date_asc': return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        case 'amount_desc': return b.amount - a.amount;
+        case 'amount_asc': return a.amount - b.amount;
+        case 'client_name': return (a.clientName || '').localeCompare(b.clientName || '');
+        default: return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
+      }
+    });
+
     return result;
-  }, [
-    state.sales,
-    state.tags,
-    search,
-    filterPayment,
-    filterStatus,
-    currentMonth,
-    currentYear,
-    sortBy,
-  ]);
+  }, [tabFiltered, search, filterPayment, filterStatus, sortBy, tags]);
 
-  // Calculate monthly summary
-  const monthlySummary = useMemo(() => {
-    const salesInMonth = state.sales.filter(
-      (s) =>
-        isInMonth(s.saleDate, currentYear, currentMonth) ||
-        hasParcelsInMonth(s, currentYear, currentMonth),
-    );
+  const hasFilters = filterPayment !== 'all' || filterStatus !== 'all';
 
-    const totalRevenue = salesInMonth
-      .filter((s) => s.status !== "cancelled")
-      .reduce((sum, s) => sum + s.totalAmount, 0);
+  const ativoFilterText = activeTab === 'vendas' ? 'Vendas' : 'A Receber';
 
-    const totalReceived =
-      salesInMonth
-        .filter((s) => s.status === "paid")
-        .reduce((sum, s) => sum + s.totalAmount, 0) +
-      salesInMonth
-        .flatMap((s) => s.installments)
-        .filter(
-          (i) =>
-            i.status === "paid" &&
-            isInMonth(i.paidDate as string, currentYear, currentMonth)
-        )
-        .reduce((sum, i) => sum + i.amount, 0);
-
-    const pending = totalRevenue - totalReceived;
-    const salesCount = salesInMonth.filter(
-      (s) => s.status !== "cancelled",
-    ).length;
-    const averageValue = salesCount > 0 ? totalRevenue / salesCount : 0;
-
-    return { totalRevenue, totalReceived, pending, salesCount, averageValue };
-  }, [state.sales, currentMonth, currentYear, hasParcelsInMonth]);
-
-  const hasFilters = filterPayment !== "all" || filterStatus !== "all";
-
-  const renderItem = ({ item }: { item: SummaryItem }) => {
-    const tags = state.tags.filter((t) => item.tagIds.includes(t.id));
-    // const paidInstallments = item.installments.filter(
-    //   (i) => i.status === "paid",
-    // ).length;
+  const renderCardItem = ({ item }: { item: SummaryItem }) => {
+    const itemTags = tags.filter(t => item.tagIds.includes(t.id));
+    const isOverdue = item.status === 'overdue' || (item.status !== 'paid' && new Date(item.dueDate) < new Date());
 
     return (
       <Pressable
         onPress={() => router.push(`/sales/${item.saleId}` as any)}
         style={({ pressed }) => [
           styles.card,
-          { backgroundColor: colors.surface, borderColor: colors.border },
+          {
+            backgroundColor: colors.surface,
+            borderColor: isOverdue ? '#EF4444' : colors.border,
+          },
           pressed && { opacity: 0.7 },
         ]}
       >
         <View style={styles.cardTop}>
           <View style={styles.cardLeft}>
-            <Text
-              style={[styles.saleTitle, { color: colors.foreground }]}
-              numberOfLines={1}
-            >
-              {item.title || "Venda"}
+            <Text style={[styles.saleTitle, { color: colors.foreground }]} numberOfLines={1}>
+              {item.title || 'Venda'}
               {item.installmentInfo && (
-                <>
-                  <Text style={[styles.metaText, { color: colors.muted }]}>
-                    {' '}({item.installmentInfo.isEntry ? `Entrada · ${getPaymentTypeLabel(item.installmentInfo.entryPaymentType || item.paymentType)}` : `${item.installmentInfo.number}/${item.installmentInfo.total}`})
-                  </Text>
-                </>
+                <Text style={[styles.installmentMeta, { color: colors.muted }]}>
+                  {' '}({item.installmentInfo.isEntry
+                      ? `Entrada · ${getPaymentTypeLabel((item.installmentInfo.entryPaymentType || item.paymentType) as PaymentType)}`
+                    : `${item.installmentInfo.number}/${item.installmentInfo.total}`})
+                </Text>
               )}
             </Text>
             {item.clientName && (
               <View style={styles.clientRow}>
                 <MaterialIcons name="person" size={12} color={colors.muted} />
-                <Text style={[styles.clientName, { color: colors.muted }]}>
-                  {item.clientName}
-                </Text>
+                <Text style={[styles.clientName, { color: colors.muted }]}>{item.clientName}</Text>
               </View>
             )}
             <View style={styles.metaRow}>
               <Text style={[styles.metaText, { color: colors.muted }]}>
-                {formatDate(item.dueDate)} {item.paidDate ? ` | Pago: ${formatDate(item.paidDate)}` : ''}
+                {formatDate(item.dueDate)}
+                {item.paidDate ? ` · Pago: ${formatDate(item.paidDate)}` : ''}
               </Text>
-              {/* <Text style={[styles.metaDot, { color: colors.muted }]}>·</Text>
-              <Text style={[styles.metaText, { color: colors.muted }]}>
-                {getPaymentTypeLabel(item.paymentType)}
-              </Text> */}
-              
             </View>
           </View>
           <View style={styles.cardRight}>
-            <Text style={[styles.amount, { color: colors.foreground }]}>
+            <Text style={[styles.amount, { color: isOverdue ? '#EF4444' : colors.foreground }]}>
               {formatCurrency(item.amount)}
             </Text>
-            <SaleStatusBadge status={item.status as any} small />
+            {item.type === 'installment' ? (
+              <InstallmentStatusBadge status={item.status as any} small />
+            ) : (
+              <SaleStatusBadge status={item.status as any} small />
+            )}
           </View>
         </View>
-        {tags.length > 0 && (
+        {itemTags.length > 0 && (
           <View style={styles.tagsRow}>
-            {tags.map((tag) => (
+            {itemTags.map(tag => (
               <TagChip key={tag.id} tag={tag} small />
             ))}
           </View>
@@ -344,118 +261,137 @@ export default function SalesScreen() {
     );
   };
 
-  return (
-    <ScreenContainer containerClassName="bg-background">
-      {/* Header compacto com navegação de mês integrada */}
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: colors.surface, borderBottomColor: colors.border },
+  const renderTableItem = ({ item }: { item: SummaryItem }) => {
+    const isOverdue = item.status === 'overdue' || (item.status !== 'paid' && new Date(item.dueDate) < new Date());
+    return (
+      <Pressable
+        onPress={() => router.push(`/sales/${item.saleId}` as any)}
+        style={({ pressed }) => [
+          styles.tableRow,
+          {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border,
+          },
+          pressed && { opacity: 0.7 },
         ]}
       >
-        <Pressable
-          onPress={handlePrevMonth}
-          style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.6 }]}
-        >
-          <MaterialIcons name="chevron-left" size={24} color={colors.primary} />
-        </Pressable>
-        <View style={styles.monthTitle}>
+        <View style={styles.tableColDate}>
+          <Text style={[styles.tableText, { color: colors.foreground }]}>{formatDate(item.dueDate)}</Text>
+        </View>
+        <View style={styles.tableColClient}>
+          <Text style={[styles.tableText, { color: colors.foreground }]} numberOfLines={1}>
+            {item.clientName || '-'}
+          </Text>
+        </View>
+        <View style={styles.tableColTitle}>
+          <Text style={[styles.tableText, { color: colors.foreground }]} numberOfLines={1}>
+            {item.title}
+          </Text>
+        </View>
+        <View style={styles.tableColAmount}>
+          <Text style={[styles.tableText, { color: isOverdue ? '#EF4444' : colors.foreground, textAlign: 'right' }]}>
+            {formatCurrency(item.amount)}
+          </Text>
+        </View>
+        <View style={styles.tableColStatus}>
+          {item.type === 'installment' ? (
+            <InstallmentStatusBadge status={item.status as any} small />
+          ) : (
+            <SaleStatusBadge status={item.status as any} small />
+          )}
+        </View>
+      </Pressable>
+    );
+  };
+
+  return (
+    <ScreenContainer containerClassName="bg-background">
+      {/* Header com tabs e navegação de mês */}
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        {/* Tabs */}
+        <View style={styles.tabRow}>
+          <Pressable
+            onPress={() => setActiveTab('vendas')}
+            style={[
+              styles.tab,
+              activeTab === 'vendas' && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+            ]}
+          >
+            <MaterialIcons name="shopping-cart" size={20} color={activeTab === 'vendas' ? colors.primary : colors.muted} />
+            <Text
+              style={[
+                styles.tabText,
+                { color: activeTab === 'vendas' ? colors.primary : colors.muted },
+              ]}
+            >
+              Vendas
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setActiveTab('a-receber')}
+            style={[
+              styles.tab,
+              activeTab === 'a-receber' && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+            ]}
+          >
+            <MaterialIcons name="monetization-on" size={20} color={activeTab === 'a-receber' ? colors.primary : colors.muted} />
+            <Text
+              style={[
+                styles.tabText,
+                { color: activeTab === 'a-receber' ? colors.primary : colors.muted },
+              ]}
+            >
+              A Receber
+            </Text>
+          </Pressable>
+        </View>
+
+        {/* Navegação de mês */}
+        <View style={styles.monthNav}>
+          <Pressable onPress={handlePrevMonth} style={styles.navBtn}>
+            <MaterialIcons name="chevron-left" size={24} color={colors.primary} />
+          </Pressable>
           <Text style={[styles.monthText, { color: colors.foreground }]}>
             {MONTHS[currentMonth]} {currentYear}
           </Text>
+          <Pressable onPress={handleNextMonth} style={styles.navBtn}>
+            <MaterialIcons name="chevron-right" size={24} color={colors.primary} />
+          </Pressable>
         </View>
-
-        <Pressable
-          onPress={handleNextMonth}
-          style={({ pressed }) => [styles.navBtn, pressed && { opacity: 0.6 }]}
-        >
-          <MaterialIcons
-            name="chevron-right"
-            size={24}
-            color={colors.primary}
-          />
-        </Pressable>
       </View>
 
-      {/* Cards de resumo */}
-      <Animated.View style={[styles.totalsContainer, { transform: [{ translateX }] }]} {...panResponder.panHandlers}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.summaryContainer}>
-          <View
-            style={[styles.summaryCard, { backgroundColor: colors.surface }]}
-          >
-            <Text style={[styles.summaryLabel, { color: colors.muted }]}>
-              Receitas
-            </Text>
-            <Text style={[styles.summaryValue, { color: colors.foreground }]}>
-              {formatCurrency(monthlySummary.totalRevenue)}
-            </Text>
-            <Text style={[styles.summarySubtext, { color: colors.muted }]}>
-              {monthlySummary.salesCount} vendas
-            </Text>
-          </View>
-          <View
-            style={[styles.summaryCard, { backgroundColor: colors.surface }]}
-          >
-            <Text style={[styles.summaryLabel, { color: colors.muted }]}>
-              Recebido
-            </Text>
-            <Text style={[styles.summaryValue, { color: "#22c55e" }]}>
-              {formatCurrency(monthlySummary.totalReceived)}
-            </Text>
-            <Text style={[styles.summarySubtext, { color: colors.muted }]}>
-              Média: {formatCurrency(monthlySummary.averageValue)}
-            </Text>
-          </View>
-          <View
-            style={[styles.summaryCard, { backgroundColor: colors.surface }]}
-          >
-            <Text style={[styles.summaryLabel, { color: colors.muted }]}>
-              Pendente
-            </Text>
-            <Text
-              style={[
-                styles.summaryValue,
-                {
-                  color: monthlySummary.pending > 0 ? "#f59e0b" : colors.muted,
-                },
-              ]}
-            >
-              {formatCurrency(monthlySummary.pending)}
-            </Text>
-            <Text style={[styles.summarySubtext, { color: colors.muted }]}>
-              A receber
-            </Text>
-          </View>
-        </ScrollView>
-      </Animated.View>
 
-      <View
-        style={[
-          styles.searchBar,
-          { backgroundColor: colors.surface, borderBottomColor: colors.border },
-        ]}
-      >
+
+      {/* Barra de busca + filtros */}
+      <View style={[styles.searchBar, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <MaterialIcons name="search" size={20} color={colors.muted} />
         <TextInput
           style={[styles.searchInput, { color: colors.foreground }]}
-          placeholder="Buscar vendas, clientes, tags..."
+          placeholder={`Buscar em ${ativoFilterText.toLowerCase()}...`}
           placeholderTextColor={colors.muted}
           value={search}
           onChangeText={setSearch}
           returnKeyType="search"
         />
         {search.length > 0 && (
-          <Pressable onPress={() => setSearch("")}>
+          <Pressable onPress={() => setSearch('')}>
             <MaterialIcons name="close" size={18} color={colors.muted} />
           </Pressable>
         )}
-        <View style={[styles.headerActions, styles.separatorLeft]}>
+        <View style={[styles.headerActions, { borderLeftColor: colors.border }]}>
+          <Pressable
+            onPress={() => setViewMode(v => v === 'card' ? 'table' : 'card')}
+            style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.7 }]}
+          >
+            <MaterialIcons
+              name={viewMode === 'card' ? 'view-list' : 'grid-view'}
+              size={20}
+              color={colors.muted}
+            />
+          </Pressable>
           <Pressable
             onPress={() => setShowSort(true)}
-            style={({ pressed }) => [
-              styles.headerBtn,
-              pressed && { opacity: 0.7 },
-            ]}
+            style={({ pressed }) => [styles.headerBtn, pressed && { opacity: 0.7 }]}
           >
             <MaterialIcons name="sort" size={20} color={colors.muted} />
           </Pressable>
@@ -463,7 +399,7 @@ export default function SalesScreen() {
             onPress={() => setShowFilters(true)}
             style={({ pressed }) => [
               styles.filterBtn,
-              hasFilters && { backgroundColor: colors.primary + "20" },
+              hasFilters && { backgroundColor: colors.primary + '20' },
               pressed && { opacity: 0.7 },
             ]}
           >
@@ -473,50 +409,35 @@ export default function SalesScreen() {
               color={hasFilters ? colors.primary : colors.muted}
             />
             {hasFilters && (
-              <View
-                style={[styles.filterDot, { backgroundColor: colors.primary }]}
-              />
+              <View style={[styles.filterDot, { backgroundColor: colors.primary }]} />
             )}
           </Pressable>
         </View>
       </View>
 
+      {/* Chips de filtros ativos */}
       {hasFilters && (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.activeFilters}
-          contentContainerStyle={{
-            paddingHorizontal: 16,
-            gap: 8,
-            paddingVertical: 8,
-          }}
+          contentContainerStyle={styles.activeFiltersContent}
         >
-          {filterPayment !== "all" && (
+          {filterPayment !== 'all' && (
             <Pressable
-              onPress={() => setFilterPayment("all")}
+              onPress={() => setFilterPayment('all')}
               style={[styles.filterChip, { backgroundColor: colors.primary }]}
             >
-              <Text style={styles.filterChipText}>
-                {getPaymentTypeLabel(filterPayment)}
-              </Text>
+              <Text style={styles.filterChipText}>{getPaymentTypeLabel(filterPayment)}</Text>
               <MaterialIcons name="close" size={14} color="#fff" />
             </Pressable>
           )}
-          {filterStatus !== "all" && (
+          {filterStatus !== 'all' && (
             <Pressable
-              onPress={() => setFilterStatus("all")}
-              style={[
-                styles.filterChip,
-                {
-                  backgroundColor: getSaleStatusColor(
-                    filterStatus as SaleStatus,
-                  ),
-                },
-              ]}
+              onPress={() => setFilterStatus('all')}
+              style={[styles.filterChip, { backgroundColor: colors.primary }]}
             >
               <Text style={styles.filterChipText}>
-                {STATUSES.find((s) => s.value === filterStatus)?.label}
+                {STATUSES.find(s => s.value === filterStatus)?.label}
               </Text>
               <MaterialIcons name="close" size={14} color="#fff" />
             </Pressable>
@@ -524,36 +445,79 @@ export default function SalesScreen() {
         </ScrollView>
       )}
 
-      <FlatList
-        data={filtered}
-        keyExtractor={(item) => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={[
-          styles.list,
-          filtered.length === 0 && { flex: 1 },
-        ]}
-        ListEmptyComponent={
-          <EmptyState
-            icon="shopping-cart"
-            title="Nenhuma venda encontrada"
-            subtitle={
-              search || hasFilters
-                ? "Tente outros filtros"
-                : "Toque no botão + para registrar sua primeira venda"
-            }
-          />
-        }
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            tintColor={colors.primary}
-            colors={[colors.primary]}
-          />
-        }
-      />
+      {/* Lista */}
+      {viewMode === 'card' ? (
+        <FlatList
+          data={filteredItems}
+          keyExtractor={item => item.id}
+          renderItem={renderCardItem}
+          contentContainerStyle={[
+            styles.list,
+            filteredItems.length === 0 && { flex: 1 },
+          ]}
+          ListEmptyComponent={
+            <EmptyState
+              icon="shopping-cart"
+              title={`Nenhum resultado em ${ativoFilterText}`}
+              subtitle={
+                search || hasFilters
+                  ? 'Tente outros filtros'
+                  : `Nenhuma venda encontrada em ${MONTHS[currentMonth]}`
+              }
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        />
+      ) : (
+        <FlatList
+          data={filteredItems}
+          keyExtractor={item => item.id}
+          renderItem={renderTableItem}
+          contentContainerStyle={[
+            styles.list,
+            filteredItems.length === 0 && { flex: 1 },
+          ]}
+          ListHeaderComponent={
+            <View style={[styles.tableHeader, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+              <Text style={[styles.tableHeaderText, styles.tableColDate, { color: colors.muted }]}>Data</Text>
+              <Text style={[styles.tableHeaderText, styles.tableColClient, { color: colors.muted }]}>Cliente</Text>
+              <Text style={[styles.tableHeaderText, styles.tableColTitle, { color: colors.muted }]}>Produto</Text>
+              <Text style={[styles.tableHeaderText, styles.tableColAmount, { color: colors.muted, textAlign: 'right' }]}>Valor</Text>
+              <Text style={[styles.tableHeaderText, styles.tableColStatus, { color: colors.muted }]}>Status</Text>
+            </View>
+          }
+          ListEmptyComponent={
+            <EmptyState
+              icon="shopping-cart"
+              title={`Nenhum resultado em ${ativoFilterText}`}
+              subtitle={
+                search || hasFilters
+                  ? 'Tente outros filtros'
+                  : `Nenhuma venda encontrada em ${MONTHS[currentMonth]}`
+              }
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+        />
+      )}
 
-      <FAB onPress={() => router.push("/sales/new" as any)} />
+      <FAB onPress={() => router.push('/sales/new' as any)} />
 
       {/* Modal de filtros */}
       <Modal
@@ -563,76 +527,40 @@ export default function SalesScreen() {
         onRequestClose={() => setShowFilters(false)}
       >
         <Pressable style={styles.overlay} onPress={() => setShowFilters(false)}>
-          <View
-            style={[styles.filterSheet, { backgroundColor: colors.surface }]}
-          >
+          <View style={[styles.filterSheet, { backgroundColor: colors.surface }]}>
             <View style={styles.sheetHandle} />
-            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>
-              Filtros
-            </Text>
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Filtros</Text>
 
-            <Text style={[styles.filterLabel, { color: colors.muted }]}>
-              Tipo de Pagamento
-            </Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 8, paddingBottom: 4 }}
-            >
-              {PAYMENT_TYPES.map((pt) => (
+            <Text style={[styles.filterLabel, { color: colors.muted }]}>Tipo de Pagamento</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingBottom: 4 }}>
+              {PAYMENT_TYPES.map(pt => (
                 <Pressable
                   key={pt.value}
                   onPress={() => setFilterPayment(pt.value)}
                   style={[
                     styles.filterOption,
-                    filterPayment === pt.value && {
-                      backgroundColor: colors.primary,
-                      borderColor: colors.primary,
-                    },
+                    filterPayment === pt.value && { backgroundColor: colors.primary, borderColor: colors.primary },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.filterOptionText,
-                      {
-                        color:
-                          filterPayment === pt.value
-                            ? "#fff"
-                            : colors.foreground,
-                      },
-                    ]}
-                  >
+                  <Text style={[styles.filterOptionText, { color: filterPayment === pt.value ? '#fff' : colors.foreground }]}>
                     {pt.label}
                   </Text>
                 </Pressable>
               ))}
             </ScrollView>
 
-            <Text style={[styles.filterLabel, { color: colors.muted }]}>
-              Status
-            </Text>
+            <Text style={[styles.filterLabel, { color: colors.muted }]}>Status</Text>
             <View style={styles.statusGrid}>
-              {STATUSES.map((s) => (
+              {STATUSES.map(s => (
                 <Pressable
                   key={s.value}
                   onPress={() => setFilterStatus(s.value)}
                   style={[
                     styles.filterOption,
-                    filterStatus === s.value && {
-                      backgroundColor: colors.primary,
-                      borderColor: colors.primary,
-                    },
+                    filterStatus === s.value && { backgroundColor: colors.primary, borderColor: colors.primary },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.filterOptionText,
-                      {
-                        color:
-                          filterStatus === s.value ? "#fff" : colors.foreground,
-                      },
-                    ]}
-                  >
+                  <Text style={[styles.filterOptionText, { color: filterStatus === s.value ? '#fff' : colors.foreground }]}>
                     {s.label}
                   </Text>
                 </Pressable>
@@ -641,26 +569,16 @@ export default function SalesScreen() {
 
             <View style={styles.sheetActions}>
               <Pressable
-                onPress={() => {
-                  setFilterPayment("all");
-                  setFilterStatus("all");
-                }}
-                style={[
-                  styles.sheetBtn,
-                  { backgroundColor: colors.background },
-                ]}
+                onPress={() => { setFilterPayment('all'); setFilterStatus('all'); }}
+                style={[styles.sheetBtn, { backgroundColor: colors.background }]}
               >
-                <Text style={[styles.sheetBtnText, { color: colors.muted }]}>
-                  Limpar
-                </Text>
+                <Text style={[styles.sheetBtnText, { color: colors.muted }]}>Limpar</Text>
               </Pressable>
               <Pressable
                 onPress={() => setShowFilters(false)}
                 style={[styles.sheetBtn, { backgroundColor: colors.primary }]}
               >
-                <Text style={[styles.sheetBtnText, { color: "#fff" }]}>
-                  Aplicar
-                </Text>
+                <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Aplicar</Text>
               </Pressable>
             </View>
           </View>
@@ -675,49 +593,28 @@ export default function SalesScreen() {
         onRequestClose={() => setShowSort(false)}
       >
         <Pressable style={styles.overlay} onPress={() => setShowSort(false)}>
-          <View
-            style={[styles.filterSheet, { backgroundColor: colors.surface }]}
-          >
+          <View style={[styles.filterSheet, { backgroundColor: colors.surface }]}>
             <View style={styles.sheetHandle} />
-            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>
-              Ordenar
-            </Text>
+            <Text style={[styles.sheetTitle, { color: colors.foreground }]}>Ordenar</Text>
 
             <View style={styles.sortOptions}>
-              {SORT_OPTIONS.map((option) => (
+              {SORT_OPTIONS.map(option => (
                 <Pressable
                   key={option.value}
-                  onPress={() => {
-                    setSortBy(option.value);
-                    setShowSort(false);
-                  }}
+                  onPress={() => { setSortBy(option.value); setShowSort(false); }}
                   style={[
                     styles.sortOption,
                     sortBy === option.value && {
-                      backgroundColor: colors.primary + "20",
+                      backgroundColor: colors.primary + '20',
                       borderColor: colors.primary,
                     },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.sortOptionText,
-                      {
-                        color:
-                          sortBy === option.value
-                            ? colors.primary
-                            : colors.foreground,
-                      },
-                    ]}
-                  >
+                  <Text style={[styles.sortOptionText, { color: sortBy === option.value ? colors.primary : colors.foreground }]}>
                     {option.label}
                   </Text>
                   {sortBy === option.value && (
-                    <MaterialIcons
-                      name="check"
-                      size={20}
-                      color={colors.primary}
-                    />
+                    <MaterialIcons name="check" size={20} color={colors.primary} />
                   )}
                 </Pressable>
               ))}
@@ -727,9 +624,7 @@ export default function SalesScreen() {
               onPress={() => setShowSort(false)}
               style={[styles.sheetBtn, { backgroundColor: colors.primary }]}
             >
-              <Text style={[styles.sheetBtnText, { color: "#fff" }]}>
-                Fechar
-              </Text>
+              <Text style={[styles.sheetBtnText, { color: '#fff' }]}>Fechar</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -739,116 +634,157 @@ export default function SalesScreen() {
 }
 
 const styles = StyleSheet.create({
-  separatorLeft: { borderLeftColor: "#334155", borderLeftWidth: 1 },
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 4,
-    paddingVertical: 8,
     borderBottomWidth: 0.5,
   },
-  title: { fontSize: 18, fontWeight: "700" },
-  headerActions: { flexDirection: "row", gap: 4 },
-  headerBtn: { padding: 8, borderRadius: 8 },
-  filterBtn: { padding: 8, borderRadius: 8, position: "relative" },
+  tabRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  tabText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  monthNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+  },
+  navBtn: {
+    padding: 8,
+  },
+  monthText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 10,
+    borderBottomWidth: 0.5,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    paddingVertical: 0,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 4,
+    borderLeftWidth: 1,
+    paddingLeft: 8,
+  },
+  headerBtn: {
+    padding: 8,
+    borderRadius: 8,
+  },
+  filterBtn: {
+    padding: 8,
+    borderRadius: 8,
+    position: 'relative',
+  },
   filterDot: {
-    position: "absolute",
+    position: 'absolute',
     top: 6,
     right: 6,
     width: 8,
     height: 8,
     borderRadius: 4,
   },
-  monthNav: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  activeFiltersContent: {
     paddingHorizontal: 16,
+    gap: 8,
     paddingVertical: 8,
-    borderBottomWidth: 0.5,
   },
-  navBtn: { padding: 8 },
-  monthTitle: {
-    alignItems: "center",
-    flex: 1,
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 6,
-  },
-  monthText: { fontSize: 16, fontWeight: "600" },
-  totalsContainer: { paddingVertical: 12 },
-  totalsScroll: { paddingHorizontal: 16, gap: 10 },
-  totalCard: {
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 0.5,
-    minWidth: 120,
-    gap: 4,
-  },
-  summaryContainer: { paddingHorizontal: 16, paddingVertical: 8, gap: 10 },
-  summaryRow: { flexDirection: "row", gap: 10 },
-  summaryCard: { flex: 1, padding: 12, borderRadius: 10 },
-  summaryLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 4,
-  },
-  summaryValue: { fontSize: 18, fontWeight: "700" },
-  summarySubtext: { fontSize: 11, marginTop: 2 },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    gap: 10,
-    borderBottomWidth: 0.5,
-  },
-  searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
-  activeFilters: { maxHeight: 50 },
   filterChip: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 20,
   },
-  filterChipText: { color: "#fff", fontSize: 12, fontWeight: "600" },
-  list: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 100 },
+  filterChipText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  list: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 100,
+  },
   card: {
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
-    borderWidth: 0.5,
-    shadowColor: "#000",
+    borderWidth: 1,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
     elevation: 2,
   },
-  cardTop: { flexDirection: "row", gap: 12 },
-  cardLeft: { flex: 1, gap: 4 },
-  saleTitle: { fontSize: 15, fontWeight: "600" },
-  clientRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  clientName: { fontSize: 12 },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    flexWrap: "wrap",
+  cardTop: {
+    flexDirection: 'row',
+    gap: 12,
   },
-  metaText: { fontSize: 12 },
-  metaDot: { fontSize: 12 },
-  cardRight: { alignItems: "flex-end", gap: 6 },
-  amount: { fontSize: 16, fontWeight: "700" },
-  tagsRow: { flexDirection: "row", flexWrap: "wrap", marginTop: 8, gap: 4 },
+  cardLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  saleTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  installmentMeta: {
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  clientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  clientName: {
+    fontSize: 12,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexWrap: 'wrap',
+  },
+  metaText: {
+    fontSize: 12,
+  },
+  cardRight: {
+    alignItems: 'flex-end',
+    gap: 6,
+  },
+  amount: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginTop: 8,
+    gap: 4,
+  },
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
   },
   filterSheet: {
     borderTopLeftRadius: 20,
@@ -861,15 +797,18 @@ const styles = StyleSheet.create({
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: "#475569",
-    alignSelf: "center",
+    backgroundColor: '#475569',
+    alignSelf: 'center',
     marginBottom: 4,
   },
-  sheetTitle: { fontSize: 18, fontWeight: "700" },
+  sheetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
   filterLabel: {
     fontSize: 13,
-    fontWeight: "600",
-    textTransform: "uppercase",
+    fontWeight: '600',
+    textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   filterOption: {
@@ -877,27 +816,87 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: '#334155',
   },
-  filterOptionText: { fontSize: 13, fontWeight: "500" },
-  statusGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  sheetActions: { flexDirection: "row", gap: 12, marginTop: 8 },
+  filterOptionText: {
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  statusGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  sheetActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
   sheetBtn: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 12,
-    alignItems: "center",
+    alignItems: 'center',
   },
-  sheetBtnText: { fontSize: 15, fontWeight: "600" },
-  sortOptions: { gap: 8 },
+  sheetBtnText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  sortOptions: {
+    gap: 8,
+  },
   sortOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     padding: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#334155",
+    borderColor: '#334155',
   },
-  sortOptionText: { fontSize: 15, fontWeight: "500" },
+  sortOptionText: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  // Table styles
+  tableHeader: {
+    flexDirection: 'row',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    gap: 8,
+  },
+  tableHeaderText: {
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tableRow: {
+    flexDirection: 'row',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 0.5,
+    alignItems: 'center',
+    gap: 8,
+  },
+  tableText: {
+    fontSize: 13,
+  },
+  tableColDate: {
+    width: 70,
+  },
+  tableColClient: {
+    flex: 1,
+  },
+  tableColTitle: {
+    flex: 1.5,
+  },
+  tableColAmount: {
+    width: 90,
+  },
+  tableColStatus: {
+    width: 70,
+    alignItems: 'flex-end',
+  },
 });

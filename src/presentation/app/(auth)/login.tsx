@@ -35,7 +35,8 @@ export default function LoginScreen() {
     try {
       const user = await login(username.trim(), password);
       if (user) {
-        router.replace('/(tabs)' as any);
+        const hasDashboard = user.permissions.includes('*') || user.permissions.includes('dashboard.view');
+        router.replace((hasDashboard ? '/(tabs)' : '/(tabs)/sales') as any);
       } else {
         setError('Usuário ou senha inválidos');
       }
@@ -114,7 +115,7 @@ export default function LoginScreen() {
             {loading ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text className="text-primary-foreground text-center font-semibold text-base">
+              <Text className="text-foreground text-center font-semibold text-base">
                 Entrar
               </Text>
             )}
@@ -125,7 +126,7 @@ export default function LoginScreen() {
               onPress={() => router.replace('/(auth)/sync-initial' as any)}
               className="mt-2"
             >
-              <Text className="text-primary text-center text-sm">
+              <Text className="text-foreground text-center text-sm">
                 Sincronizar com o Desktop
               </Text>
             </Pressable>
