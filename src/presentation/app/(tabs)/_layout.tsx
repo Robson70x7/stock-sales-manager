@@ -4,10 +4,13 @@ import { Platform } from "react-native";
 import { HapticTab } from "@/components/haptic-tab";
 import { IconSymbol } from "@/components/ui/icon-symbol";
 import { useColors } from "@/hooks/use-colors";
+import { usePermissions } from "@shared/hooks/use-permissions";
+import { PERMISSIONS } from "@shared/auth/permissions";
 
 export default function TabLayout() {
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const { can } = usePermissions();
   const bottomPadding = Platform.OS === "web" ? 12 : Math.max(insets.bottom, 8);
   const tabBarHeight = 56 + bottomPadding;
 
@@ -37,6 +40,7 @@ export default function TabLayout() {
         options={{
           title: "Resumo",
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="house.fill" color={color} />,
+          ...(can(PERMISSIONS.DASHBOARD_VIEW) ? {} : { href: null }),
         }}
       />
       <Tabs.Screen
@@ -44,6 +48,7 @@ export default function TabLayout() {
         options={{
           title: "Vendas",
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="cart.fill" color={color} />,
+          ...(can(PERMISSIONS.SALES_VIEW) ? {} : { href: null }),
         }}
       />
       <Tabs.Screen
@@ -51,6 +56,7 @@ export default function TabLayout() {
         options={{
           title: "Produtos",
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="cube.box.fill" color={color} />,
+          ...(can(PERMISSIONS.PRODUCTS_VIEW) ? {} : { href: null }),
         }}
       />
       <Tabs.Screen
@@ -58,6 +64,7 @@ export default function TabLayout() {
         options={{
           title: "Clientes",
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.2.fill" color={color} />,
+          ...(can(PERMISSIONS.CLIENTS_VIEW) ? {} : { href: null }),
         }}
       />
       <Tabs.Screen
@@ -65,6 +72,7 @@ export default function TabLayout() {
         options={{
           title: "Relatórios",
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="chart.bar.fill" color={color} />,
+          ...(can(PERMISSIONS.REPORTS_VIEW) ? {} : { href: null }),
         }}
       />
       <Tabs.Screen
@@ -72,6 +80,7 @@ export default function TabLayout() {
         options={{
           title: "Tags",
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="tag.fill" color={color} />,
+          ...(can(PERMISSIONS.TAGS_VIEW) ? {} : { href: null }),
         }}
       />
       <Tabs.Screen
@@ -79,6 +88,7 @@ export default function TabLayout() {
         options={{
           title: "Configurações",
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="gear" color={color} />,
+          ...(can(PERMISSIONS.SETTINGS_MANAGE) ? {} : { href: null }),
         }}
       />
     </Tabs>

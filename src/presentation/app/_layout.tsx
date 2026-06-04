@@ -78,8 +78,9 @@ export default function RootLayout() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <QueryClientProvider client={queryClient}>
             <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="oauth/callback" />
               <Stack.Screen name="sales/new" options={{ title: "Nova Venda", presentation: "fullScreenModal", ...headerOptions }} />
               <Stack.Screen name="sales/[id]" options={{ title: "Detalhes da Venda", ...headerOptions }} />
               <Stack.Screen name="sales/edit/[id]" options={{ title: "Editar Venda", presentation: "fullScreenModal", ...headerOptions }} />

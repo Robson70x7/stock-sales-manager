@@ -49,16 +49,33 @@ export class SyncManager {
     }
   }
 
-  async syncAll(): Promise<{ products: number; clients: number; tags: number; suppliers: number; sales: number }> {
+  async syncAll(): Promise<{
+    products: number; clients: number; tags: number; suppliers: number;
+    users: number; roles: number;
+    sales: number;
+  }> {
     if (!this.adapter || !(this.adapter instanceof LocalP2PSyncAdapter)) {
       throw new Error('Adaptador não é LocalP2PSyncAdapter');
     }
 
     const adapter = this.adapter as LocalP2PSyncAdapter;
-    const result = { products: 0, clients: 0, tags: 0, suppliers: 0, sales: 0 };
+    const result = {
+      products: 0, clients: 0, tags: 0, suppliers: 0,
+      users: 0, roles: 0,
+      sales: 0,
+    };
 
     try {
       this.updateState({ status: 'syncing' });
+
+      // Pull auth entities first (roles with embedded permissions > users)
+      this.updateState({ status: 'syncing', error: 'Sincronizando papéis...' });
+      const rolesSince = await getSetting('last_sync_timestamp_roles');
+      result.roles = await pullCatalog(adapter, 'roles', rolesSince || undefined);
+
+      this.updateState({ status: 'syncing', error: 'Sincronizando usuários...' });
+      const usersSince = await getSetting('last_sync_timestamp_users');
+      result.users = await pullCatalog(adapter, 'users', usersSince || undefined);
 
       // Pull catalog for each entity
       this.updateState({ status: 'syncing', error: 'Sincronizando produtos...' });

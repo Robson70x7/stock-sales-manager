@@ -19,15 +19,18 @@ export async function getDb(): Promise<SQLite.SQLiteDatabase> {
 // Migrations
 // ============================================================
 
-export async function migrateDbIfNeeded(db: SQLite.SQLiteDatabase): Promise<void> {
+export async function migrateDbIfNeeded(database: SQLite.SQLiteDatabase): Promise<void> {
+  if (!db) {
+    db = database;
+  }
   try {
-    const tableCheck = await db.getFirstAsync<{ name: string }>(
+    const tableCheck = await database.getFirstAsync<{ name: string }>(
       "SELECT name FROM sqlite_master WHERE type='table' AND name='db_version'"
     );
 
     let currentVersion = 0;
     if (tableCheck) {
-      const result = await db.getFirstAsync<{ version: number }>(
+      const result = await database.getFirstAsync<{ version: number }>(
         'SELECT COALESCE(MAX(version), 0) as version FROM db_version'
       );
       currentVersion = result?.version ?? 0;
@@ -39,8 +42,8 @@ export async function migrateDbIfNeeded(db: SQLite.SQLiteDatabase): Promise<void
 
     for (const migration of migrations) {
       if (migration.version > currentVersion) {
-        await db.execAsync(migration.sql);
-        await db.runAsync(
+        await database.execAsync(migration.sql);
+        await database.runAsync(
           'INSERT INTO db_version (version, appliedAt) VALUES (?, ?)',
           [migration.version, new Date().toISOString()]
         );
@@ -867,4 +870,80 @@ export async function getAllSettings(): Promise<Record<string, string>> {
   const database = await getDb();
   const rows = await database.getAllAsync<DbSetting>('SELECT * FROM settings');
   return Object.fromEntries(rows.map(r => [r.key, r.value ?? '']));
+}
+
+// ============================================================
+// AUTH MERGE HELPERS (for sync pull from desktop)
+// ============================================================
+
+export async function mergeRoles(roles: any[]): Promise<void> {
+  const database = await getDb();
+  for (const role of roles) {
+    const existing = await database.getFirstAsync<{ id: string }>(
+      'SELECT id FROM roles WHERE id = ?', [role.id]
+    );
+    if (existing) {
+      await database.runAsync(
+        `UPDATE roles SET name = ?, description = ?, isSystem = ?, createdAt = ? WHERE id = ?`,
+        [role.name, role.description || null, role.isSystem ?? 0, role.createdAt || new Date().toISOString(), role.id]
+      );
+    } else {
+      await database.runAsync(
+        `INSERT INTO roles (id, name, description, isSystem, createdAt) VALUES (?, ?, ?, ?, ?)`,
+        [role.id, role.name, role.description || null, role.isSystem ?? 0, role.createdAt || new Date().toISOString()]
+      );
+    }
+
+    // Process embedded permissions
+    if (role.permissions && Array.isArray(role.permissions)) {
+      // Delete existing role_permissions for this role
+      await database.runAsync('DELETE FROM role_permissions WHERE roleId = ?', [role.id]);
+      for (const permKey of role.permissions) {
+        // Find or ignore — permission is pre-seeded or we skip unknown ones
+        const perm = await database.getFirstAsync<{ id: string }>(
+          'SELECT id FROM permissions WHERE key = ?', [permKey]
+        );
+        if (perm) {
+          await database.runAsync(
+            'INSERT OR IGNORE INTO role_permissions (roleId, permissionId) VALUES (?, ?)',
+            [role.id, perm.id]
+          );
+        }
+      }
+    }
+  }
+}
+
+export async function mergeUsers(users: any[]): Promise<void> {
+  const database = await getDb();
+  for (const user of users) {
+    const existing = await database.getFirstAsync<{ id: string }>(
+      'SELECT id FROM users WHERE id = ?', [user.id]
+    );
+    if (existing) {
+      await database.runAsync(
+        `UPDATE users SET name = ?, username = ?, passwordHash = ?, roleId = ?,
+         isActive = ?, mustChangePassword = ?, createdAt = ?, updatedAt = ?,
+         lastLoginAt = ?, recoveryCodeHash = ? WHERE id = ?`,
+        [
+          user.name, user.username, user.passwordHash, user.roleId,
+          user.isActive ?? 1, user.mustChangePassword ?? 0,
+          user.createdAt || new Date().toISOString(), user.updatedAt || new Date().toISOString(),
+          user.lastLoginAt || null, user.recoveryCodeHash || null, user.id,
+        ]
+      );
+    } else {
+      await database.runAsync(
+        `INSERT INTO users (id, name, username, passwordHash, roleId, isActive,
+         mustChangePassword, createdAt, updatedAt, lastLoginAt, recoveryCodeHash)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          user.id, user.name, user.username, user.passwordHash, user.roleId,
+          user.isActive ?? 1, user.mustChangePassword ?? 0,
+          user.createdAt || new Date().toISOString(), user.updatedAt || new Date().toISOString(),
+          user.lastLoginAt || null, user.recoveryCodeHash || null,
+        ]
+      );
+    }
+  }
 }

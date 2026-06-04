@@ -42,7 +42,7 @@ export interface DesktopSyncMessage {
   version?: string;
   deviceId?: string;
   correlationId?: string;
-  entity?: 'products' | 'clients' | 'tags' | 'suppliers';
+  entity?: 'products' | 'clients' | 'tags' | 'suppliers' | 'users' | 'roles';
   since?: string;
   data?: any;
   timestamp?: string;

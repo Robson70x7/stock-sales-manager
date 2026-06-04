@@ -1,9 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Switch } from 'react-native';
+import { View, Text, ScrollView, Pressable, StyleSheet, Switch, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
 import { useApp } from '@shared/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
+import { AuthService } from '@shared/lib/auth-service';
 import { SyncManager, LocalP2PSyncAdapter, DeviceDiscoveryService } from '@shared/sync';
 import { SyncButton } from '@/components/sync/SyncButton';
 import { SyncModal } from '@/components/sync/SyncModal';
@@ -15,6 +17,7 @@ import { SqlConsole } from '@/components/dev/SqlConsole';
 export default function SettingsScreen() {
   const { state, updateSettings } = useApp();
   const colors = useColors();
+  const router = useRouter();
 
   const [syncManager] = useState(() => new SyncManager());
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'connected' | 'error' | 'reconnecting'>('idle');
@@ -164,6 +167,24 @@ export default function SettingsScreen() {
     await updateSettings({ askReturnStockOnDelete: value });
   };
 
+  const handleLogout = () => {
+    Alert.alert(
+      'Sair',
+      'Tem certeza que deseja sair?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Sair',
+          style: 'destructive',
+          onPress: async () => {
+            await AuthService.logout();
+            router.replace('/(auth)/login');
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <ScreenContainer containerClassName="bg-background">
       <Pressable
@@ -233,6 +254,16 @@ export default function SettingsScreen() {
               <Text style={[styles.infoValue, { color: colors.foreground }]}>{DeviceInfo.getApplicationName()}</Text>
             </View>
           </View>
+        </View>
+
+        <View style={styles.section}>
+          <Pressable
+            onPress={handleLogout}
+            style={[styles.logoutButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          >
+            <MaterialIcons name="logout" size={24} color="#EF4444" />
+            <Text style={styles.logoutText}>Sair</Text>
+          </Pressable>
         </View>
       </ScrollView>
 
@@ -340,5 +371,20 @@ const styles = StyleSheet.create({
   infoValue: {
     fontSize: 14,
     fontWeight: '600',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    gap: 8,
+  },
+  logoutText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#EF4444',
   },
 });

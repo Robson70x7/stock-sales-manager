@@ -1,10 +1,16 @@
 import { DesktopSyncMessage } from '../types';
 import { LocalP2PSyncAdapter } from '../adapters/local-p2p';
-import { mergeProducts, mergeClients, mergeTags, mergeSuppliers, saveSetting } from '@infra/database/db';
+import {
+  mergeProducts, mergeClients, mergeTags, mergeSuppliers,
+  mergeUsers, mergeRoles,
+  saveSetting,
+} from '@infra/database/db';
+
+export type SyncEntity = 'products' | 'clients' | 'tags' | 'suppliers' | 'users' | 'roles';
 
 export async function pullCatalog(
   adapter: LocalP2PSyncAdapter,
-  entity: 'products' | 'clients' | 'tags' | 'suppliers',
+  entity: SyncEntity,
   since?: string,
 ): Promise<number> {
   const message: DesktopSyncMessage = {
@@ -44,6 +50,12 @@ export async function applyPullResult(
       break;
     case 'suppliers':
       await mergeSuppliers(data);
+      break;
+    case 'roles':
+      await mergeRoles(data);
+      break;
+    case 'users':
+      await mergeUsers(data);
       break;
     default:
       throw new Error(`Entidade desconhecida: ${entity}`);
