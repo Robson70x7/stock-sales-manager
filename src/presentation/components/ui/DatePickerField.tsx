@@ -1,7 +1,8 @@
-import { View, Text, Pressable, StyleSheet, Modal, ScrollView } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useState, useMemo } from 'react';
+import { formatDateISO } from '@shared/lib/utils';
 
 interface DatePickerFieldProps {
   label: string;
@@ -59,10 +60,9 @@ export function DatePickerField({ label, value, onChange, placeholder }: DatePic
   }, [displayYear, displayMonth]);
 
   const handleSelectDay = (day: number) => {
-    const newDate = new Date(displayYear, displayMonth, day);
-    const dateStr = newDate.toISOString().split('T')[0];
+    const dateStr = formatDateISO(displayYear, displayMonth, day);
     onChange(dateStr);
-    setSelectedDate(newDate);
+    setSelectedDate(new Date(displayYear, displayMonth, day));
     setShowPicker(false);
   };
 
@@ -85,7 +85,7 @@ export function DatePickerField({ label, value, onChange, placeholder }: DatePic
   };
 
   const displayValue = value
-    ? new Date(value + 'T00:00:00').toLocaleDateString('pt-BR')
+    ? (([y, m, d]) => `${d}/${m}/${y}`)(value.split('-'))
     : placeholder || 'Selecione uma data';
 
   return (

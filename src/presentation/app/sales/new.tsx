@@ -10,7 +10,7 @@ import { useCreateSale } from '@/hooks/useCreateSale';
 import { useCreateClient } from '@/hooks/useCreateClient';
 import { TagChip } from '@/components/ui/TagChip';
 import { DatePickerField } from '@/components/ui/DatePickerField';
-import { generateInstallments, generateInstallmentsWithEntry, formatCurrency, getPaymentTypeLabel, applyCurrencyMask, unmaskCurrency } from '@shared/lib/utils';
+import { generateInstallments, generateInstallmentsWithEntry, formatCurrency, getPaymentTypeLabel, applyCurrencyMask, unmaskCurrency, formatDateISO } from '@shared/lib/utils';
 import { PaymentType, SaleItem } from '@shared/types';
 
 const PAYMENT_TYPES: PaymentType[] = ['cash', 'pix', 'credit_card', 'debit_card'];
@@ -28,8 +28,9 @@ export default function NewSaleScreen() {
   const [selectedClientId, setSelectedClientId] = useState<string | undefined>();
   const [paymentType, setPaymentType] = useState<PaymentType>('cash');
   const [installmentsCount, setInstallmentsCount] = useState(1);
-  const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
-  const [firstInstallmentDate, setFirstInstallmentDate] = useState(new Date().toISOString().split('T')[0]);
+  const today = new Date();
+  const [saleDate, setSaleDate] = useState(formatDateISO(today.getFullYear(), today.getMonth(), today.getDate()));
+  const [firstInstallmentDate, setFirstInstallmentDate] = useState(formatDateISO(today.getFullYear(), today.getMonth(), today.getDate()));
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [items, setItems] = useState<SaleItem[]>([]);
   // const [manualAmount, setManualAmount] = useState('');
@@ -177,8 +178,8 @@ export default function NewSaleScreen() {
         installmentsCount: count,
         installments,
         tagIds: selectedTagIds,
-        saleDate: new Date(saleDate).toISOString(),
-        firstInstallmentDate: new Date(firstInstallmentDate).toISOString(),
+        saleDate: `${saleDate}T00:00:00.000Z`,
+        firstInstallmentDate: `${firstInstallmentDate}T00:00:00.000Z`,
       });
       
       router.back();

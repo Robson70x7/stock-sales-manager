@@ -5,7 +5,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
 import { DatePickerField } from '@/components/ui/DatePickerField';
-import { formatCurrency, getPaymentTypeLabel, generateInstallments } from '@shared/lib/utils';
+import { formatCurrency, getPaymentTypeLabel, generateInstallments, formatDateISO } from '@shared/lib/utils';
 import { PaymentType, SaleStatus } from '@shared/types';
 import { useSale } from '@/hooks/useSale';
 import { useClients } from '@/hooks/useClients';
@@ -90,11 +90,11 @@ export default function EditSaleScreen() {
         clientName: selectedClient?.name ?? null,
         paymentType,
         status: finalStatus,
-        saleDate: new Date(saleDate).toISOString(),
+        saleDate: `${saleDate}T00:00:00.000Z`,
         tagIds: selectedTagIds,
         installmentsCount: finalInstallmentsCount,
         installments,
-        firstInstallmentDate: new Date(firstInstallmentDate).toISOString(),
+        firstInstallmentDate: `${firstInstallmentDate}T00:00:00.000Z`,
       });
       router.back();
     } catch (e) {

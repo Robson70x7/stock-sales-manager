@@ -37,6 +37,14 @@ export function unmaskCurrency(value: string): number {
   return parseFloat(cleaned) || 0;
 }
 
+// Constrói string YYYY-MM-DD a partir de componentes numéricos (sem timezone)
+export function formatDateISO(year: number, month: number, day: number): string {
+  const y = String(year).padStart(4, '0');
+  const m = String(month + 1).padStart(2, '0');
+  const d = String(day).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
 // Formata data para exibição
 export function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
