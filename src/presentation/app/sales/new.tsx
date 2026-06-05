@@ -2,8 +2,12 @@ import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, StyleSheet, Alert, Modal, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useApp } from '@shared/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
+import { useClients } from '@/hooks/useClients';
+import { useProducts } from '@/hooks/useProducts';
+import { useTags } from '@/hooks/useTags';
+import { useCreateSale } from '@/hooks/useCreateSale';
+import { useCreateClient } from '@/hooks/useCreateClient';
 import { TagChip } from '@/components/ui/TagChip';
 import { DatePickerField } from '@/components/ui/DatePickerField';
 import { generateInstallments, generateInstallmentsWithEntry, formatCurrency, getPaymentTypeLabel, applyCurrencyMask, unmaskCurrency } from '@shared/lib/utils';
@@ -12,7 +16,11 @@ import { PaymentType, SaleItem } from '@shared/types';
 const PAYMENT_TYPES: PaymentType[] = ['cash', 'pix', 'credit_card', 'debit_card'];
 
 export default function NewSaleScreen() {
-  const { state, addSale, addClient } = useApp();
+  const { data: clients = [] } = useClients();
+  const { data: products = [] } = useProducts();
+  const { data: tags = [] } = useTags();
+  const { mutateAsync: addSale } = useCreateSale();
+  const { mutateAsync: addClient } = useCreateClient();
   const colors = useColors();
   const router = useRouter();
 
@@ -38,7 +46,7 @@ export default function NewSaleScreen() {
   const [productSearch, setProductSearch] = useState('');
   const [isPaid, setIsPaid] = useState(false);
 
-  const selectedClient = state.clients.find(c => c.id === selectedClientId);
+  const selectedClient = clients.find(c => c.id === selectedClientId);
 
   const totalFromItems = items.reduce((sum, i) => sum + i.totalPrice, 0);
   const subtotal = totalFromItems
@@ -67,7 +75,7 @@ export default function NewSaleScreen() {
 
 
   const addProduct = (productId: string) => {
-    const product = state.products.find(p => p.id === productId);
+    const product = products.find(p => p.id === productId);
     if (!product) return;
     
     const existing = items.find(i => i.productId === productId);
@@ -103,7 +111,7 @@ export default function NewSaleScreen() {
   const updateItemQty = (productId: string, qty: number) => {
     if (qty <= 0) { removeItem(productId); return; }
     
-    const product = state.products.find(p => p.id === productId);
+    const product = products.find(p => p.id === productId);
     if (!product) return;
     
     if (qty > product.stock) {
@@ -428,11 +436,11 @@ export default function NewSaleScreen() {
         </View>
 
         {/* Tags */}
-        {state.tags.length > 0 && (
+        {tags.length > 0 && (
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: colors.foreground }]}>Tags</Text>
             <View style={styles.tagsWrap}>
-              {state.tags.map(tag => (
+              {tags.map(tag => (
                 <TagChip key={tag.id} tag={tag} selected={selectedTagIds.includes(tag.id)} onPress={() => toggleTag(tag.id)} />
               ))}
             </View>
@@ -462,7 +470,7 @@ export default function NewSaleScreen() {
               onChangeText={setClientSearch}
             />
             <FlatList
-              data={state.clients.filter(c => !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase()))}
+              data={clients.filter(c => !clientSearch || c.name.toLowerCase().includes(clientSearch.toLowerCase()))}
               keyExtractor={c => c.id}
               renderItem={({ item }) => (
                 <Pressable
@@ -493,7 +501,7 @@ export default function NewSaleScreen() {
               onChangeText={setProductSearch}
             />
             <FlatList
-              data={state.products.filter(p => p.stock > 0 && (!productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())))}
+              data={products.filter(p => p.stock > 0 && (!productSearch || p.name.toLowerCase().includes(productSearch.toLowerCase())))}
               keyExtractor={p => p.id}
               renderItem={({ item }) => (
                 <Pressable

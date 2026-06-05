@@ -2,8 +2,12 @@ import { useState } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useApp } from '@shared/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
+import { useSale } from '@/hooks/useSale';
+import { useTags } from '@/hooks/useTags';
+import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
+import { useDeleteSale } from '@/hooks/useDeleteSale';
+import { useUpdateInstallment } from '@/hooks/useUpdateInstallment';
 import { TagChip } from '@/components/ui/TagChip';
 import { SaleStatusBadge, InstallmentStatusBadge } from '@/components/ui/StatusBadge';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
@@ -13,21 +17,31 @@ import * as Haptics from 'expo-haptics';
 
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, deleteSale, updateInstallment, updateSettings } = useApp();
+  const { data: settings } = useSettings();
+  const { data: sale, isLoading } = useSale(id);
+  const { data: allTags = [] } = useTags();
+  const { mutateAsync: deleteSale } = useDeleteSale();
+  const { mutateAsync: updateInstallment } = useUpdateInstallment();
+  const { mutateAsync: updateSettings } = useUpdateSettings();
   const colors = useColors();
   const router = useRouter();
   const [showDelete, setShowDelete] = useState(false);
   const [showReturnStock, setShowReturnStock] = useState(false);
   const [dontAskAgain, setDontAskAgain] = useState(false);
 
-  const sale = state.sales.find(s => s.id === id);
+  if (isLoading) return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: colors.muted }}>Carregando...</Text>
+    </View>
+  );
+
   if (!sale) return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ color: colors.muted }}>Venda não encontrada</Text>
     </View>
   );
 
-  const tags = state.tags.filter(t => sale.tagIds.includes(t.id));
+  const tags = allTags.filter(t => sale.tagIds.includes(t.id));
   const paidAmount = sale.installments.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
   const pendingAmount = sale.totalAmount - paidAmount;
 
@@ -35,12 +49,12 @@ export default function SaleDetailScreen() {
     if (dontAskAgain) {
       await updateSettings({ askReturnStockOnDelete: false });
     }
-    await deleteSale(sale.id, returnStock);
+    await deleteSale({ id: sale.id, returnStock });
     router.back();
   };
 
   const handleDeletePress = () => {
-    if (state.settings.askReturnStockOnDelete) {
+    if (settings?.askReturnStockOnDelete ?? true) {
       setShowReturnStock(true);
     } else {
       setShowDelete(true);
@@ -65,7 +79,7 @@ export default function SaleDetailScreen() {
     };
     console.log('Iniciando alteração de parcela');
     console.log(`Dados para alteração`, JSON.stringify(updated,null,2))
-    await updateInstallment(sale.id, updated);
+    await updateInstallment({ saleId: sale.id, installment: updated });
   };
 
   return (

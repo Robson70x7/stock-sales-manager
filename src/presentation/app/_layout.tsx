@@ -9,7 +9,7 @@ import "@shared/_core/nativewind-pressable";
 import { ThemeProvider } from "@shared/lib/theme-provider";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "@shared/lib/query-client";
-import { AppProvider } from "@shared/context/AppContext";
+
 import {
   SafeAreaFrameContext,
   SafeAreaInsetsContext,
@@ -74,25 +74,22 @@ export default function RootLayout() {
   };
 
   const content = (
-    <AppProvider>
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <QueryClientProvider client={queryClient}>
-            <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="index" />
-              <Stack.Screen name="(auth)" />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="sales/new" options={{ title: "Nova Venda", presentation: "fullScreenModal", ...headerOptions }} />
-              <Stack.Screen name="sales/[id]" options={{ title: "Detalhes da Venda", ...headerOptions }} />
-              <Stack.Screen name="sales/edit/[id]" options={{ title: "Editar Venda", presentation: "fullScreenModal", ...headerOptions }} />
-              <Stack.Screen name="products/[id]" options={{ title: "Detalhes do Produto", ...headerOptions }} />
-              <Stack.Screen name="clients/[id]" options={{ title: "Detalhes do Cliente", ...headerOptions }} />
-              <Stack.Screen name="tags/index" options={{ title: "Tags", ...headerOptions }} />
-              <Stack.Screen name="tags/[id]" options={{ title: "Detalhes da Tag", ...headerOptions }} />
-            </Stack>
-        </QueryClientProvider>
-        <StatusBar style="light" />
-      </GestureHandlerRootView>
-    </AppProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <QueryClientProvider client={queryClient}>
+          <Stack screenOptions={{ headerShown: false }}>
+            <Stack.Screen name="index" />
+            <Stack.Screen name="(auth)" />
+            <Stack.Screen name="(tabs)" />
+            <Stack.Screen name="sales/new" options={{ title: "Nova Venda", presentation: "fullScreenModal", ...headerOptions }} />
+            <Stack.Screen name="sales/[id]" options={{ title: "Detalhes da Venda", ...headerOptions }} />
+            <Stack.Screen name="sales/edit/[id]" options={{ title: "Editar Venda", presentation: "fullScreenModal", ...headerOptions }} />
+            <Stack.Screen name="products/[id]" options={{ title: "Detalhes do Produto", ...headerOptions }} />
+            <Stack.Screen name="clients/[id]" options={{ title: "Detalhes do Cliente", ...headerOptions }} />
+            <Stack.Screen name="tags/index" options={{ title: "Tags", ...headerOptions }} />
+          </Stack>
+      </QueryClientProvider>
+      <StatusBar style="light" />
+    </GestureHandlerRootView>
   );
 
   const shouldOverrideSafeArea = Platform.OS === "web";

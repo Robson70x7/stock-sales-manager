@@ -1,7 +1,6 @@
 import { BaseSyncAdapter } from '../sync-adapter';
 import { SyncDevice, SyncMessage, SyncStrategy, DesktopSyncMessage } from '../types';
 import { DeviceDiscoveryService } from '../device-discovery';
-import { sha256 } from '@shared/lib/crypto-utils';
 
 interface PendingRequest {
   resolve: (data: DesktopSyncMessage) => void;
@@ -114,8 +113,6 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
       throw new Error('Não conectado ao desktop');
     }
 
-    const passwordHash = await sha256(password);
-
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(new Error('Timeout de autenticação'));
@@ -153,7 +150,7 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
       const authMsg: DesktopSyncMessage = {
         type: 'auth_request',
         username,
-        passwordHash,
+        password,
       };
       this.ws!.send(JSON.stringify(authMsg));
     });

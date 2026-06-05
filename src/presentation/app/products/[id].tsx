@@ -1,23 +1,19 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, Modal, TextInput } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useApp } from '@shared/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { formatCurrency, formatDate, getMovementTypeLabel } from '@shared/lib/utils';
 import { getStockMovementsByProduct, DbStockMovement, getProductTags } from '@infra/database/db';
+import { useProduct } from '@/hooks/useProduct';
+import { useTags } from '@/hooks/useTags';
 
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { state, deleteProduct, addStockMovement } = useApp();
   const colors = useColors();
-  const router = useRouter();
-  const [showDelete, setShowDelete] = useState(false);
-  const [showEntry, setShowEntry] = useState(false);
-  const [entryQuantity, setEntryQuantity] = useState('1');
-  const [entryNotes, setEntryNotes] = useState('');
+  const { data: product, isLoading } = useProduct(id);
+  const { data: tags = [] } = useTags();
   const [movements, setMovements] = useState<DbStockMovement[]>([]);
   const [productTagIds, setProductTagIds] = useState<string[]>([]);
 
@@ -26,7 +22,12 @@ export default function ProductDetailScreen() {
     getProductTags(id).then(setProductTagIds);
   }, [id]);
 
-  const product = state.products.find(p => p.id === id);
+  if (isLoading) return (
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <Text style={{ color: colors.muted }}>Carregando...</Text>
+    </View>
+  );
+
   if (!product) return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <Text style={{ color: colors.muted }}>Produto não encontrado</Text>
@@ -35,31 +36,6 @@ export default function ProductDetailScreen() {
 
   const stockColor = product.stock <= 0 ? '#DC2626' : product.stock <= 5 ? '#D97706' : '#16A34A';
   const margin = product.averageCost > 0 ? ((product.salePrice - product.averageCost) / product.averageCost * 100).toFixed(1) : null;
-
-  const handleDelete = async () => {
-    await deleteProduct(product.id);
-    router.back();
-  };
-
-  const handleStockEntry = async () => {
-    const qty = parseInt(entryQuantity) || 0;
-    if (qty <= 0) {
-      Alert.alert('Atenção', 'Informe uma quantidade válida.');
-      return;
-    }
-    await addStockMovement({
-      productId: product.id,
-      quantity: qty,
-      type: 'in',
-      notes: entryNotes.trim() || undefined,
-    });
-    setShowEntry(false);
-    setEntryQuantity('1');
-    setEntryNotes('');
-
-    getStockMovementsByProduct(id).then(setMovements);
-    
-  };
 
   return (
     <ScrollView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -73,7 +49,7 @@ export default function ProductDetailScreen() {
           {product.description && <Text style={[styles.description, { color: colors.muted }]}>{product.description}</Text>}
           {productTagIds.length > 0 && (
             <View style={styles.tagsRow}>
-              {state.tags.filter(t => productTagIds.includes(t.id)).map(tag => (
+              {tags.filter(t => productTagIds.includes(t.id)).map(tag => (
                 <TagChip key={tag.id} tag={tag} small />
               ))}
             </View>
@@ -148,82 +124,7 @@ export default function ProductDetailScreen() {
             })}
           </View>
         )}
-
-        <View style={styles.actions}>
-          <Pressable
-            onPress={() => setShowEntry(true)}
-            style={({ pressed }) => [styles.editBtn, { backgroundColor: '#16A34A' }, pressed && { opacity: 0.8 }]}
-          >
-            <MaterialIcons name="add-circle" size={18} color="#fff" />
-            <Text style={styles.editBtnText}>Entrada</Text>
-          </Pressable>
-
-          <Pressable
-            onPress={() => setShowDelete(true)}
-            style={({ pressed }) => [styles.deleteBtn, { borderColor: '#DC2626' }, pressed && { opacity: 0.7 }]}
-          >
-            <MaterialIcons name="delete" size={18} color="#DC2626" />
-            <Text style={[styles.deleteBtnText, { color: '#DC2626' }]}>Excluir</Text>
-          </Pressable>
-        </View>
       </View>
-
-      <Modal visible={showEntry} transparent animationType="slide" onRequestClose={() => setShowEntry(false)}>
-        <Pressable style={styles.overlay} onPress={() => setShowEntry(false)}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-            <Text style={[styles.modalTitle, { color: colors.foreground }]}>Entrada Manual de Estoque</Text>
-            <Text style={[styles.modalProduct, { color: colors.muted }]}>{product.name}</Text>
-
-            <View style={styles.inputRow}>
-              <Text style={[styles.label, { color: colors.muted }]}>Quantidade</Text>
-              <TextInput
-                style={[styles.input, { color: colors.foreground }]}
-                value={entryQuantity}
-                onChangeText={setEntryQuantity}
-                keyboardType="number-pad"
-                placeholder="1"
-                placeholderTextColor={colors.muted}
-              />
-            </View>
-
-            <View style={styles.inputRow}>
-              <Text style={[styles.label, { color: colors.muted }]}>Observação</Text>
-              <TextInput
-                style={[styles.input, { color: colors.foreground }]}
-                value={entryNotes}
-                onChangeText={setEntryNotes}
-                placeholder="Opcional"
-                placeholderTextColor={colors.muted}
-              />
-            </View>
-
-            <View style={styles.modalActions}>
-              <Pressable
-                onPress={() => setShowEntry(false)}
-                style={[styles.modalBtn, { backgroundColor: colors.background }]}
-              >
-                <Text style={[styles.modalBtnText, { color: colors.muted }]}>Cancelar</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleStockEntry}
-                style={[styles.modalBtn, { backgroundColor: '#16A34A' }]}
-              >
-                <Text style={[styles.modalBtnText, { color: '#fff' }]}>Adicionar</Text>
-              </Pressable>
-            </View>
-          </View>
-        </Pressable>
-      </Modal>
-
-      <ConfirmDialog
-        visible={showDelete}
-        title="Excluir Produto"
-        message={`Deseja excluir "${product.name}"? Esta ação não pode ser desfeita.`}
-        confirmLabel="Excluir"
-        destructive
-        onConfirm={handleDelete}
-        onCancel={() => setShowDelete(false)}
-      />
     </ScrollView>
   );
 }
@@ -235,8 +136,6 @@ const styles = StyleSheet.create({
   iconCircle: { width: 64, height: 64, borderRadius: 32, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   productName: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
   category: { fontSize: 14 },
-  sku: { fontSize: 12, fontFamily: 'monospace' },
-  supplier: { fontSize: 12 },
   description: { fontSize: 14, textAlign: 'center', lineHeight: 20 },
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 6, marginTop: 4 },
   statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
@@ -244,26 +143,10 @@ const styles = StyleSheet.create({
   statLabel: { fontSize: 12 },
   statValue: { fontSize: 18, fontWeight: '700' },
   stockRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  minStockText: { fontSize: 10 },
   dateText: { fontSize: 12, textAlign: 'center' },
-  actions: { flexDirection: 'row', gap: 12 },
-  editBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12 },
-  editBtnText: { color: '#fff', fontSize: 15, fontWeight: '600' },
-  deleteBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1.5 },
-  deleteBtnText: { fontSize: 15, fontWeight: '600' },
-  overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  modalContent: { borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, gap: 16, paddingBottom: 32 },
-  modalTitle: { fontSize: 18, fontWeight: '700' },
-  modalProduct: { fontSize: 14, marginTop: -12 },
-  modalActions: { flexDirection: 'row', gap: 12, marginTop: 8 },
-  modalBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  modalBtnText: { fontSize: 15, fontWeight: '600' },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  label: { fontSize: 14, width: 100 },
-  input: { flex: 1, fontSize: 14, textAlign: 'right' },
+  infoCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 0.5 },
   card: { borderRadius: 12, padding: 14, borderWidth: 0.5, gap: 10 },
   cardTitle: { fontSize: 14, fontWeight: '700' },
-  infoCard: { flexDirection: 'row', alignItems: 'center', gap: 8, borderRadius: 12, padding: 12, borderWidth: 0.5 },
   divider: { height: 0.5 },
   movementRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
   movementDot: { width: 10, height: 10, borderRadius: 5, marginTop: 5 },

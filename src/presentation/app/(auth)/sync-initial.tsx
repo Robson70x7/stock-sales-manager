@@ -189,7 +189,7 @@ export default function SyncInitialScreen() {
               className="mt-2 bg-primary px-8 py-4 rounded-xl w-full"
               style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
             >
-              <Text className="text-primary-foreground text-center font-semibold text-base">
+              <Text className="text-foreground text-center font-semibold text-base">
                 Conectar e Sincronizar
               </Text>
             </Pressable>

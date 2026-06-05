@@ -87,7 +87,7 @@ export class Product {
   static create(input: CreateProductInput): Product {
     const now = new Date().toISOString();
     return new Product({
-      id: crypto.randomUUID?.() ?? generateFallbackId(),
+      id: generateFallbackId(),
       name: input.name,
       description: input.description ?? null,
       category: input.category ?? null,

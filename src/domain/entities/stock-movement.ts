@@ -63,7 +63,7 @@ export class StockMovement {
     const now = new Date().toISOString();
     const totalCost = unitCost != null ? unitCost * quantity : null;
     return new StockMovement({
-      id: crypto.randomUUID?.() ?? generateFallbackId(),
+      id: generateFallbackId(),
       productId,
       quantity,
       type: 'out',

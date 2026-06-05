@@ -71,7 +71,7 @@ export class Client {
   static create(input: CreateClientInput): Client {
     const now = new Date().toISOString();
     return new Client({
-      id: crypto.randomUUID?.() ?? generateFallbackId(),
+      id: generateFallbackId(),
       name: input.name,
       document: input.document ?? null,
       phone: input.phone ?? null,

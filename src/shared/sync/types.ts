@@ -52,6 +52,7 @@ export interface DesktopSyncMessage {
   message?: string;
   token?: string;
   encryptionSalt?: string;
+  password?: string;
   passwordHash?: string;
   username?: string;
   user?: {

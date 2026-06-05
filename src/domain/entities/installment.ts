@@ -69,7 +69,7 @@ export class Installment {
     amount: number; dueDate: string; type?: InstallmentType;
   }): Installment {
     return new Installment({
-      id: crypto.randomUUID?.() ?? generateFallbackId(),
+      id: generateFallbackId(),
       saleId: input.saleId,
       number: input.number,
       totalInstallments: input.totalInstallments,

@@ -255,7 +255,7 @@ export class Sale {
   static create(input: CreateSaleInput): Sale {
     const now = new Date().toISOString();
     return new Sale({
-      id: crypto.randomUUID?.() ?? generateFallbackId(),
+      id: generateFallbackId(),
       description: input.description ?? null,
       clientId: input.clientId ?? null,
       clientName: input.clientName ?? null,
@@ -273,7 +273,7 @@ export class Sale {
       tagIds: input.tagIds,
       items: input.items.map(i => SaleItem.create({
         ...i,
-        id: i.id || (crypto.randomUUID?.() ?? generateFallbackId()),
+        id: i.id || generateFallbackId(),
         saleId: i.saleId || '',
       })),
       installments: input.installments.map(inst =>

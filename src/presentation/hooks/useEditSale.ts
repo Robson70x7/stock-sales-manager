@@ -6,6 +6,7 @@ import { ProductRepository } from '@infra/database/repositories/product-reposito
 import { StockMovementRepository } from '@infra/database/repositories/stock-movement-repository';
 import { Sale, SaleItem } from '@domain/entities/sale';
 import { Installment } from '@domain/entities/installment';
+import { generateId } from '@shared/lib/utils';
 import type { Sale as SaleType, SaleItem as SaleItemType, Installment as InstallmentType } from '@shared/types';
 
 export function useEditSale() {
@@ -35,7 +36,7 @@ export function useEditSale() {
         firstInstallmentDate: data.firstInstallmentDate ?? null,
         tagIds: data.tagIds,
         items: data.items.map(i => SaleItem.create({
-          id: i.id || (crypto.randomUUID?.() ?? fallbackId()),
+          id: i.id || generateId(),
           saleId: data.id,
           productId: i.productId,
           productName: i.productName,
@@ -72,10 +73,4 @@ export function useEditSale() {
   });
 }
 
-function fallbackId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
+

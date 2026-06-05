@@ -31,7 +31,7 @@ export class Tag {
 
   static create(input: { name: string; color: string }): Tag {
     return new Tag({
-      id: crypto.randomUUID?.() ?? generateFallbackId(),
+      id: generateFallbackId(),
       name: input.name,
       color: input.color,
       createdAt: new Date().toISOString(),

@@ -3,8 +3,8 @@ import { View, Text, ScrollView, Pressable, StyleSheet, Switch, Alert } from 're
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ScreenContainer } from '@/components/screen-container';
-import { useApp } from '@shared/context/AppContext';
 import { useColors } from '@/hooks/use-colors';
+import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
 import { AuthService } from '@shared/lib/auth-service';
 import { SyncManager, LocalP2PSyncAdapter, DeviceDiscoveryService } from '@shared/sync';
 import { SyncButton } from '@/components/sync/SyncButton';
@@ -15,7 +15,8 @@ import { queryClient } from '@shared/lib/query-client';
 import { SqlConsole } from '@/components/dev/SqlConsole';
 
 export default function SettingsScreen() {
-  const { state, updateSettings } = useApp();
+  const { data: settings } = useSettings();
+  const { mutateAsync: updateSettings } = useUpdateSettings();
   const colors = useColors();
   const router = useRouter();
 
@@ -230,10 +231,10 @@ export default function SettingsScreen() {
               </View>
             </View>
             <Switch
-              value={state.settings.askReturnStockOnDelete}
+              value={settings?.askReturnStockOnDelete ?? true}
               onValueChange={handleToggleAskReturnStock}
               trackColor={{ false: colors.border, true: colors.primary + '50' }}
-              thumbColor={state.settings.askReturnStockOnDelete ? colors.primary : colors.muted}
+              thumbColor={settings?.askReturnStockOnDelete ? colors.primary : colors.muted}
             />
           </View>
         </View>
