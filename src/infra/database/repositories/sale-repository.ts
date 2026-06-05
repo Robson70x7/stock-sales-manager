@@ -1,6 +1,7 @@
 import * as db from '@infra/database/db';
 import { Sale, SaleItem } from '@domain/entities/sale';
 import { Installment } from '@domain/entities/installment';
+import { formatDateISO } from '@shared/lib/utils';
 import type { ISaleRepository } from '@application/ports/i-sale-repository';
 
 export class SaleRepository implements ISaleRepository {
@@ -36,13 +37,14 @@ export class SaleRepository implements ISaleRepository {
   async findByMonth(year: number, month: number): Promise<Sale[]> {
     const database = await db.getDb();
     const startDate = `${year}-${String(month + 1).padStart(2, '0')}-01`;
-    const endDate = new Date(year, month + 1, 0).toISOString().split('T')[0];
+    const lastDay = new Date(year, month + 1, 0).getDate();
+    const endDate = formatDateISO(year, month, lastDay);
 
     const rows = await database.getAllAsync<db.DbSale>(
       `SELECT * FROM sales WHERE isDeleted = 0 AND (
-        (DATE(saleDate) >= ? AND DATE(saleDate) <= ?) OR EXISTS (
+        (substr(saleDate, 1, 10) >= ? AND substr(saleDate, 1, 10) <= ?) OR EXISTS (
           SELECT 1 FROM installments WHERE saleId = sales.id AND isDeleted = 0 AND (
-            (DATE(dueDate) >= ? AND DATE(dueDate) <= ?) OR (DATE(paidDate) >= ? AND DATE(paidDate) <= ?)
+            (substr(dueDate, 1, 10) >= ? AND substr(dueDate, 1, 10) <= ?) OR (substr(paidDate, 1, 10) >= ? AND substr(paidDate, 1, 10) <= ?)
           )
         )
       ) ORDER BY saleDate DESC`,
