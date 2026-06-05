@@ -185,7 +185,7 @@ export default function SalesScreen() {
     if (activeTab === 'vendas') {
       return vendasSales;
     }
-    return summaryItems.filter(i => i.status !== 'paid');
+    return summaryItems;
   }, [vendasSales, summaryItems, activeTab]);
 
   // Aplicar busca, filtros e ordenação

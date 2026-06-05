@@ -69,6 +69,7 @@ export class SaleService {
     const now = new Date().toISOString();
     const updatedSale = Sale.restore({
       ...sale,
+      syncStatus: sale.syncStatus === 'synced' ? 'pending' : sale.syncStatus,
       updatedAt: now,
     });
     await this.saleRepo.save(updatedSale);
@@ -82,6 +83,10 @@ export class SaleService {
     const allInst = await this.saleRepo.getInstallments(saleId);
     const newStatus = SaleService.determineSaleStatus(allInst);
     await this.saleRepo.updateStatus(saleId, newStatus);
+
+    if (sale.syncStatus === 'synced') {
+      await this.saleRepo.updateSyncStatus(saleId, 'pending');
+    }
   }
 
   static determineSaleStatus(installments: { status: string }[]): string {

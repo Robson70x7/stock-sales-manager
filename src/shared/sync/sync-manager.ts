@@ -1,6 +1,7 @@
 import { BaseSyncAdapter } from './sync-adapter';
 import { SyncState, SyncConflict, SyncMessage, DesktopSyncMessage } from './types';
-import { getSetting, saveSetting, getSales } from '@infra/database/db';
+import { getSetting, saveSetting } from '@infra/database/db';
+import { SaleRepository } from '@infra/database/repositories/sale-repository';
 import { pullCatalog, applyPullResult } from './handlers/pull-handler';
 import { sendSale, processAck } from './handlers/sale-handler';
 import { LocalP2PSyncAdapter } from './adapters/local-p2p';
@@ -80,6 +81,14 @@ export class SyncManager {
     adapter.onMessage((message: SyncMessage) => {
       this.handleMessage(message);
     });
+
+    if (adapter instanceof LocalP2PSyncAdapter) {
+      adapter.onStatusChange((status) => {
+        if (status === 'disconnected') {
+          this.updateState({ status: 'error', error: 'Conexão perdida com o desktop' });
+        }
+      });
+    }
   }
 
   async connectAndAuth(username: string, password: string): Promise<{
@@ -174,7 +183,8 @@ export class SyncManager {
 
   async getPendingSales(): Promise<any[]> {
     try {
-      const sales = await getSales();
+      const repo = new SaleRepository();
+      const sales = await repo.findAll();
       return sales.filter(s => s.syncStatus !== 'synced');
     } catch {
       return [];
@@ -235,8 +245,6 @@ export class SyncManager {
   }
 
   private handleMessage(message: SyncMessage): void {
-    console.log('[SyncManager] Mensagem recebida:', message);
-
     const desktopMsg = message.data as DesktopSyncMessage;
 
     switch (message.type) {

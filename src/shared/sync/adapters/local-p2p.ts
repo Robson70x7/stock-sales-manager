@@ -70,12 +70,10 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
       }
 
       const url = `ws://${this.desktopIp}:${this.port}`;
-      console.log(`[P2P] Conectando a ${url}...`);
 
       this.ws = new WebSocket(url);
 
       this.ws.onopen = () => {
-        console.log('[P2P] WebSocket conectado');
         this.connected = true;
         this.emitStatus('connected');
         resolve();
@@ -97,7 +95,6 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
       };
 
       this.ws.onclose = () => {
-        console.log('[P2P] WebSocket fechado');
         this.connected = false;
         this.ws = null;
         this.authToken = null;
@@ -131,7 +128,6 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
             if (msg.status === 'ok' && msg.token && msg.user) {
               this.authToken = msg.token;
               this.sessionUser = msg.user;
-              console.log('[P2P] Autenticado como', msg.user.username);
               resolve({ token: msg.token, user: msg.user, encryptionSalt: msg.encryptionSalt || '' });
             } else {
               reject(new Error(msg.message || 'Credenciais inválidas'));
@@ -205,7 +201,6 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
     }
     this.connected = false;
     this.emitStatus('disconnected');
-    console.log('[P2P] Desconectado');
   }
 
   async sync(data: any): Promise<any> {
@@ -230,7 +225,6 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
 
       try {
         const payload = JSON.stringify(msg);
-        console.log(`[P2P] Enviando mensagem (${data.type}):`, payload.substring(0, 200));
         this.ws!.send(payload);
       } catch (err) {
         clearTimeout(timer);

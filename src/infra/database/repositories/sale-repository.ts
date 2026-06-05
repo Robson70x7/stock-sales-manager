@@ -10,7 +10,6 @@ export class SaleRepository implements ISaleRepository {
     if (!row) return null;
     const items = await db.getSaleItems(id);
     const installments = await db.getInstallments(id);
-    console.log('installments no findById:', { installments });
     return Sale.fromDb(
       row,
       items.map(SaleItem.fromDb),
@@ -101,5 +100,9 @@ export class SaleRepository implements ISaleRepository {
 
   async updateStatus(saleId: string, status: string): Promise<void> {
     await db.updateSaleStatus(saleId, status);
+  }
+
+  async updateSyncStatus(saleId: string, syncStatus: string, syncError?: string, syncWarnings?: string): Promise<void> {
+    await db.updateSaleSyncStatus(saleId, syncStatus, syncError, syncWarnings);
   }
 }

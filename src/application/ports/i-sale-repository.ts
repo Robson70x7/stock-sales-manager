@@ -17,4 +17,5 @@ export interface ISaleRepository {
     status: string; history: string; type: string;
   }[]>;
   updateStatus(saleId: string, status: string): Promise<void>;
+  updateSyncStatus(saleId: string, syncStatus: string, syncError?: string, syncWarnings?: string): Promise<void>;
 }

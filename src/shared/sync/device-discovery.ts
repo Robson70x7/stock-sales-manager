@@ -22,7 +22,6 @@ export class DeviceDiscoveryService {
     this.isRunning = true;
     this.abortScan = false;
     this.scanFailCount = 0;
-    console.log('[Discovery] Iniciando descoberta de dispositivos...');
     await this.runScan();
   }
 
@@ -36,7 +35,6 @@ export class DeviceDiscoveryService {
     this.devices.clear();
     this.manualDevices.clear();
     this.notifyUpdate();
-    console.log('[Discovery] Parando descoberta...');
   }
 
   async runOnce(): Promise<SyncDevice[]> {
@@ -84,13 +82,9 @@ export class DeviceDiscoveryService {
 
     try {
       const localIp = await DeviceInfo.getIpAddress();
-      console.log('[Discovery] IP local:', localIp);
 
       if (localIp && localIp !== 'unknown' && localIp.includes('.')) {
         ips = this.getSubnetFromIp(localIp);
-        if (ips.length > 0) {
-          console.log(`[Discovery] Escaneando sub-rede ${localIp.substring(0, localIp.lastIndexOf('.') + 1)}x...`);
-        }
       }
     } catch {
       console.warn('[Discovery] Não foi possível obter IP local');
@@ -104,14 +98,12 @@ export class DeviceDiscoveryService {
         return;
       }
       ips = this.getSubnets();
-      console.log(`[Discovery] Escaneando sub-redes comuns (${FALLBACK_SUBNETS.length} ranges)...`);
     } else {
       this.scanFailCount = 0;
     }
 
     await this.scanIps(ips);
     this.purgeStaleDevices();
-    console.log(`[Discovery] Scan concluído. Dispositivos: ${this.devices.size}`);
   }
 
   private async scanIps(ips: string[]): Promise<void> {
@@ -149,7 +141,6 @@ export class DeviceDiscoveryService {
           port: SCAN_PORT,
           lastSeen: Date.now(),
         };
-        console.log(`[Discovery] Desktop encontrado em ${ip}`);
         this.addDevice(device);
 
         setTimeout(() => {
