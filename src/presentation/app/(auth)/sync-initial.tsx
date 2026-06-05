@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { View, Text, Pressable, ActivityIndicator } from 'react-native';
+import { useState, useCallback, useRef } from 'react';
+import { View, Text, TextInput, Pressable, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { SyncManager, LocalP2PSyncAdapter, DeviceDiscoveryService } from '@shared/sync';
+import { AuthService } from '@shared/lib/auth-service';
 import { DeviceInfo } from 'react-native-device-info';
 
-type SyncStep = 'idle' | 'discovering' | 'connecting' | 'syncing' | 'success' | 'error';
+type SyncStep = 'idle' | 'discovering' | 'connecting' | 'authenticating' | 'syncing' | 'success' | 'error';
 
 export default function SyncInitialScreen() {
   const insets = useSafeAreaInsets();
@@ -17,18 +18,18 @@ export default function SyncInitialScreen() {
   const [step, setStep] = useState<SyncStep>('idle');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [syncDetails, setSyncDetails] = useState<string>('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
 
   const syncManagerRef = useRef<SyncManager | null>(null);
   const discoveryRef = useRef<DeviceDiscoveryService | null>(null);
 
-  useEffect(() => {
-    return () => {
-      syncManagerRef.current?.disconnect();
-      discoveryRef.current?.stop();
-    };
-  }, []);
-
   const handleSync = useCallback(async () => {
+    if (!username.trim() || !password.trim()) {
+      setErrorMsg('Preencha usuário e senha');
+      return;
+    }
+
     setStep('discovering');
     setErrorMsg('');
     setSyncDetails('');
@@ -63,28 +64,47 @@ export default function SyncInitialScreen() {
 
       await manager.initialize(adapter);
 
+      setStep('authenticating');
+      setSyncDetails('Autenticando...');
+
+      const { token, user } = await manager.connectAndAuth(username.trim(), password);
+      setPassword('');
+
       setStep('syncing');
       setSyncDetails('Sincronizando dados...');
 
-      await manager.syncAll();
+      const result = await manager.syncAll();
+
+      setSyncDetails(`Sincronização concluída: ${result.products} produtos, ${result.clients} clientes, ${result.tags} tags, ${result.suppliers} fornecedores`);
+
+      await AuthService.createSessionFromUser(user, token);
 
       setStep('success');
       setSyncDetails('Sincronização concluída com sucesso!');
 
       setTimeout(() => {
-        router.replace('/(auth)/login' as any);
+        const hasDashboard = user.permissions.includes('*') || user.permissions.includes('dashboard.view');
+        router.replace((hasDashboard ? '/(tabs)' : '/(tabs)/sales') as any);
       }, 1500);
     } catch (error) {
-      setStep('error');
-      setErrorMsg(error instanceof Error ? error.message : 'Erro ao sincronizar');
-      setSyncDetails('');
+      const message = error instanceof Error ? error.message : 'Erro ao sincronizar';
+      if (message.includes('autentica') || message.includes('Credenciais') || message.includes('inválidas')) {
+        setStep('idle');
+        setErrorMsg('Usuário ou senha inválidos. Verifique suas credenciais e tente novamente.');
+        setSyncDetails('');
+      } else {
+        setStep('error');
+        setErrorMsg(message);
+        setSyncDetails('');
+      }
     }
-  }, [router]);
+  }, [username, password, router]);
 
   const getStatusIcon = () => {
     switch (step) {
       case 'discovering': return 'wifi-find';
       case 'connecting': return 'link';
+      case 'authenticating': return 'lock';
       case 'syncing': return 'sync';
       case 'success': return 'check-circle';
       case 'error': return 'error';
@@ -122,10 +142,61 @@ export default function SyncInitialScreen() {
         </Text>
 
         <Text className="text-base text-foreground mt-3 text-center leading-6">
-          Conecte-se ao computador onde o VendaFácil Desktop está rodando na mesma rede para sincronizar seus dados.
+          Conecte-se ao VendaFácil Desktop na mesma rede para sincronizar seus dados.
         </Text>
 
-        {(step === 'discovering' || step === 'connecting' || step === 'syncing') && (
+        {step === 'idle' && (
+          <View className="w-full max-w-sm mt-8 gap-4">
+            <View>
+              <Text className="text-sm font-medium text-foreground mb-1.5">
+                Usuário
+              </Text>
+              <TextInput
+                value={username}
+                onChangeText={setUsername}
+                placeholder="Digite seu usuário do Desktop"
+                placeholderTextColor={colors.muted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                className="bg-surface border border-border rounded-xl px-4 py-3.5 text-foreground text-base"
+                style={{ borderColor: colors.border }}
+              />
+            </View>
+
+            <View>
+              <Text className="text-sm font-medium text-foreground mb-1.5">
+                Senha
+              </Text>
+              <TextInput
+                value={password}
+                onChangeText={setPassword}
+                placeholder="Digite sua senha"
+                placeholderTextColor={colors.muted}
+                secureTextEntry
+                className="bg-surface border border-border rounded-xl px-4 py-3.5 text-foreground text-base"
+                style={{ borderColor: colors.border }}
+              />
+            </View>
+
+            {errorMsg ? (
+              <View className="bg-red-500/10 rounded-xl p-3 border border-red-500/20">
+                <Text className="text-red-500 text-sm text-center">{errorMsg}</Text>
+              </View>
+            ) : null}
+
+            <Pressable
+              onPress={handleSync}
+              className="mt-2 bg-primary px-8 py-4 rounded-xl w-full"
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text className="text-primary-foreground text-center font-semibold text-base">
+                Conectar e Sincronizar
+              </Text>
+            </Pressable>
+          </View>
+        )}
+
+        {(step === 'discovering' || step === 'connecting' || step === 'authenticating' || step === 'syncing') && (
           <View className="flex-row items-center gap-3 mt-8">
             <ActivityIndicator size="small" color={colors.primary} />
             <Text className="text-sm text-foreground">{syncDetails}</Text>
@@ -137,6 +208,15 @@ export default function SyncInitialScreen() {
             <View className="bg-red-500/10 rounded-xl p-4 border border-red-500/20">
               <Text className="text-red-500 text-sm text-center">{errorMsg}</Text>
             </View>
+            <Pressable
+              onPress={() => { setStep('idle'); setErrorMsg(''); }}
+              className="mt-4 bg-primary px-8 py-4 rounded-xl w-full"
+              style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
+            >
+              <Text className="text-primary-foreground text-center font-semibold text-base">
+                Tentar Novamente
+              </Text>
+            </Pressable>
           </View>
         )}
 
@@ -144,18 +224,6 @@ export default function SyncInitialScreen() {
           <Text className="text-base text-green-500 mt-6">
             {syncDetails}
           </Text>
-        )}
-
-        {(step === 'idle' || step === 'error') && (
-          <Pressable
-            onPress={handleSync}
-            className="mt-8 bg-primary px-8 py-4 rounded-xl w-full max-w-sm"
-            style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}
-          >
-            <Text className="text-primary-foreground text-center font-semibold text-base">
-              {step === 'error' ? 'Tentar Novamente' : 'Sincronizar Agora'}
-            </Text>
-          </Pressable>
         )}
       </View>
     </View>

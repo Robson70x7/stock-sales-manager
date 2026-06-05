@@ -1,6 +1,7 @@
 import { BaseSyncAdapter } from '../sync-adapter';
 import { SyncDevice, SyncMessage, SyncStrategy, DesktopSyncMessage } from '../types';
 import { DeviceDiscoveryService } from '../device-discovery';
+import { sha256 } from '@shared/lib/crypto-utils';
 
 interface PendingRequest {
   resolve: (data: DesktopSyncMessage) => void;
@@ -15,9 +16,8 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
   private port: number = 9999;
   private desktopIp: string | null = null;
   private discovery: DeviceDiscoveryService;
-  private handshakeTimeout: ReturnType<typeof setTimeout> | null = null;
-  private handshakeResolve: (() => void) | null = null;
-  private handshakeReject: ((err: Error) => void) | null = null;
+  private authToken: string | null = null;
+  private sessionUser: any = null;
   private pendingRequests = new Map<string, PendingRequest>();
   private statusCallbacks: ((status: 'connected' | 'disconnected', message?: string) => void)[] = [];
 
@@ -36,6 +36,14 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
     for (const cb of this.statusCallbacks) {
       cb(status, message);
     }
+  }
+
+  getToken(): string | null {
+    return this.authToken;
+  }
+
+  isAuthenticated(): boolean {
+    return this.authToken !== null;
   }
 
   async connect(): Promise<void> {
@@ -71,10 +79,7 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
         console.log('[P2P] WebSocket conectado');
         this.connected = true;
         this.emitStatus('connected');
-        this.handshakeResolve = resolve;
-        this.handshakeReject = reject;
-        this.startHandshakeTimeout();
-        setTimeout(() => this.performHandshake(), 200);
+        resolve();
       };
 
       this.ws.onmessage = (event: MessageEvent) => {
@@ -96,49 +101,65 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
         console.log('[P2P] WebSocket fechado');
         this.connected = false;
         this.ws = null;
+        this.authToken = null;
+        this.sessionUser = null;
         this.rejectAllPending(new Error('Conexão perdida'));
         this.emitStatus('disconnected', 'Conexão perdida');
       };
     });
   }
 
-  private performHandshake(): void {
-    if (!this.ws) return;
-    const handshake: DesktopSyncMessage = {
-      type: 'handshake',
-      version: '1.0',
-      deviceId: this.deviceId,
-    };
-    const payload = JSON.stringify(handshake);
-    console.log('[P2P] Enviando handshake:', payload);
-    this.ws.send(payload);
-  }
+  async authenticate(username: string, password: string): Promise<{ token: string; user: any; encryptionSalt: string }> {
+    if (!this.connected || !this.ws) {
+      throw new Error('Não conectado ao desktop');
+    }
 
-  private startHandshakeTimeout(): void {
-    this.handshakeTimeout = setTimeout(() => {
-      if (this.handshakeReject) {
-        this.handshakeReject(new Error('Handshake timeout'));
-        this.handshakeResolve = null;
-        this.handshakeReject = null;
-      }
-      this.disconnect();
-    }, 5000);
+    const passwordHash = await sha256(password);
+
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        reject(new Error('Timeout de autenticação'));
+        this.disconnect();
+      }, 10000);
+
+      const originalHandler = this.ws!.onmessage;
+      const authHandler = (event: MessageEvent) => {
+        try {
+          const msg = JSON.parse(event.data) as DesktopSyncMessage;
+
+          if (msg.type === 'auth_response') {
+            clearTimeout(timer);
+            this.ws!.onmessage = originalHandler;
+
+            if (msg.status === 'ok' && msg.token && msg.user) {
+              this.authToken = msg.token;
+              this.sessionUser = msg.user;
+              console.log('[P2P] Autenticado como', msg.user.username);
+              resolve({ token: msg.token, user: msg.user, encryptionSalt: msg.encryptionSalt || '' });
+            } else {
+              reject(new Error(msg.message || 'Credenciais inválidas'));
+            }
+            return;
+          }
+
+          this.handleDesktopMessage(msg);
+        } catch (err) {
+          console.error('[P2P] Erro no auth handler:', err);
+        }
+      };
+
+      this.ws!.onmessage = authHandler;
+
+      const authMsg: DesktopSyncMessage = {
+        type: 'auth_request',
+        username,
+        passwordHash,
+      };
+      this.ws!.send(JSON.stringify(authMsg));
+    });
   }
 
   private handleDesktopMessage(message: DesktopSyncMessage): void {
-    if (message.type === 'handshake_ack') {
-      if (this.handshakeTimeout) {
-        clearTimeout(this.handshakeTimeout);
-        this.handshakeTimeout = null;
-      }
-      if (this.handshakeResolve) {
-        this.handshakeResolve();
-        this.handshakeResolve = null;
-        this.handshakeReject = null;
-      }
-      return;
-    }
-
     const correlationId = message.correlationId;
     if (correlationId && this.pendingRequests.has(correlationId)) {
       const pending = this.pendingRequests.get(correlationId)!;
@@ -162,7 +183,7 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
   }
 
   private rejectAllPending(error: Error): void {
-    for (const [id, pending] of this.pendingRequests) {
+    for (const [, pending] of this.pendingRequests) {
       clearTimeout(pending.timer);
       pending.reject(error);
     }
@@ -170,17 +191,9 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
   }
 
   async disconnect(): Promise<void> {
-    if (this.handshakeTimeout) {
-      clearTimeout(this.handshakeTimeout);
-      this.handshakeTimeout = null;
-    }
-    if (this.handshakeReject) {
-      this.handshakeReject(new Error('Desconectado'));
-      this.handshakeResolve = null;
-      this.handshakeReject = null;
-    }
-
     this.rejectAllPending(new Error('Desconectado'));
+    this.authToken = null;
+    this.sessionUser = null;
 
     if (this.ws) {
       this.ws.close();
@@ -196,8 +209,12 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
       throw new Error('Não conectado ao desktop');
     }
 
+    if (!this.authToken) {
+      throw new Error('Não autenticado. Execute authenticate() primeiro.');
+    }
+
     const correlationId = this.generateId();
-    const msg = { ...data, correlationId };
+    const msg = { ...data, correlationId, token: this.authToken };
 
     return new Promise<DesktopSyncMessage>((resolve, reject) => {
       const timer = setTimeout(() => {

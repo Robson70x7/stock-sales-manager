@@ -1,5 +1,5 @@
 import { BaseSyncAdapter } from './sync-adapter';
-import { SyncState, SyncStrategy, SyncConflict, SyncMessage, DesktopSyncMessage } from './types';
+import { SyncState, SyncConflict, SyncMessage, DesktopSyncMessage } from './types';
 import { getSetting, saveSetting, getSales } from '@infra/database/db';
 import { pullCatalog, applyPullResult } from './handlers/pull-handler';
 import { sendSale, processAck } from './handlers/sale-handler';
@@ -35,15 +35,30 @@ export class SyncManager {
     adapter.onMessage((message: SyncMessage) => {
       this.handleMessage(message);
     });
+  }
+
+  async connectAndAuth(username: string, password: string): Promise<{
+    token: string;
+    user: { id: string; name: string; username: string; roleName: string; permissions: string[] };
+    encryptionSalt: string;
+  }> {
+    if (!this.adapter || !(this.adapter instanceof LocalP2PSyncAdapter)) {
+      throw new Error('Adaptador não é LocalP2PSyncAdapter');
+    }
+
+    const adapter = this.adapter as LocalP2PSyncAdapter;
 
     try {
-      this.updateState({ status: 'syncing', error: undefined });
+      this.updateState({ status: 'syncing', error: 'Conectando ao desktop...' });
       await adapter.connect();
+      this.updateState({ status: 'connected', error: 'Autenticando...' });
+      const result = await adapter.authenticate(username, password);
       this.updateState({ status: 'connected', error: undefined });
+      return result;
     } catch (error) {
       this.updateState({
         status: 'error',
-        error: `Erro ao conectar: ${error}`,
+        error: `${error}`,
       });
       throw error;
     }
@@ -51,7 +66,6 @@ export class SyncManager {
 
   async syncAll(): Promise<{
     products: number; clients: number; tags: number; suppliers: number;
-    users: number; roles: number;
     sales: number;
   }> {
     if (!this.adapter || !(this.adapter instanceof LocalP2PSyncAdapter)) {
@@ -61,23 +75,12 @@ export class SyncManager {
     const adapter = this.adapter as LocalP2PSyncAdapter;
     const result = {
       products: 0, clients: 0, tags: 0, suppliers: 0,
-      users: 0, roles: 0,
       sales: 0,
     };
 
     try {
       this.updateState({ status: 'syncing' });
 
-      // Pull auth entities first (roles with embedded permissions > users)
-      this.updateState({ status: 'syncing', error: 'Sincronizando papéis...' });
-      const rolesSince = await getSetting('last_sync_timestamp_roles');
-      result.roles = await pullCatalog(adapter, 'roles', rolesSince || undefined);
-
-      this.updateState({ status: 'syncing', error: 'Sincronizando usuários...' });
-      const usersSince = await getSetting('last_sync_timestamp_users');
-      result.users = await pullCatalog(adapter, 'users', usersSince || undefined);
-
-      // Pull catalog for each entity
       this.updateState({ status: 'syncing', error: 'Sincronizando produtos...' });
       const productsSince = await getSetting('last_sync_timestamp_products');
       result.products = await pullCatalog(adapter, 'products', productsSince || undefined);
@@ -207,11 +210,7 @@ export class SyncManager {
           });
         }
         break;
-      case 'handshake_ack':
-        if (desktopMsg?.deviceId) {
-          this.state.desktopDeviceId = desktopMsg.deviceId;
-          saveSetting('desktop_device_id', desktopMsg.deviceId).catch(() => {});
-        }
+      case 'auth_response':
         break;
       case 'sync-request':
         break;

@@ -92,15 +92,14 @@ export default function TabLayout() {
           ...(can(PERMISSIONS.SETTINGS_MANAGE) ? {} : { href: null }),
         }}
       />
-      {!can(PERMISSIONS.SETTINGS_MANAGE) && (
-        <Tabs.Screen
-          name="logout"
-          options={{
-            title: "Sair",
-            tabBarIcon: ({ color }) => <MaterialIcons size={24} name="logout" color={color} />,
-          }}
-        />
-      )}
+      <Tabs.Screen
+        name="logout"
+        options={{
+          title: "Sair",
+          tabBarIcon: ({ color }) => <MaterialIcons size={24} name="logout" color={color} />,
+          ...(can(PERMISSIONS.SETTINGS_MANAGE) ? { href: null } : {}),
+        }}
+      />
     </Tabs>
   );
 }

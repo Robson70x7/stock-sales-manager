@@ -113,6 +113,74 @@ export class AuthService {
     await db.runAsync('DELETE FROM active_session');
   }
 
+  static async createSessionFromUser(
+    user: { id: string; name: string; username: string; roleName: string; permissions: string[] },
+    syncToken?: string,
+  ): Promise<AuthenticatedUser> {
+    const db = await getDb();
+
+    const now = new Date().toISOString();
+
+    const role = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM roles WHERE name = ?',
+      [user.roleName]
+    );
+    const roleId = role?.id || '';
+
+    const existingUser = await db.getFirstAsync<{ id: string }>(
+      'SELECT id FROM users WHERE id = ?',
+      [user.id]
+    );
+
+    if (existingUser) {
+      await db.runAsync(
+        `UPDATE users SET name = ?, username = ?, roleId = ?, updatedAt = ? WHERE id = ?`,
+        [user.name, user.username, roleId, now, user.id]
+      );
+    } else {
+      await db.runAsync(
+        `INSERT INTO users (id, name, username, passwordHash, roleId, isActive, mustChangePassword, createdAt, updatedAt)
+         VALUES (?, ?, ?, '', ?, 1, 0, ?, ?)`,
+        [user.id, user.name, user.username, roleId, now, now]
+      );
+    }
+
+    const token = generateId();
+    await db.runAsync('DELETE FROM active_session');
+    await db.runAsync(
+      'INSERT INTO active_session (userId, token, startedAt, syncToken) VALUES (?, ?, ?, ?)',
+      [user.id, token, now, syncToken || null]
+    );
+    await db.runAsync(
+      'UPDATE users SET lastLoginAt = ? WHERE id = ?',
+      [now, user.id]
+    );
+
+    return {
+      id: user.id,
+      name: user.name,
+      username: user.username,
+      roleId,
+      roleName: user.roleName,
+      permissions: user.permissions,
+      mustChangePassword: false,
+      lastLoginAt: null,
+    };
+  }
+
+  static async getSyncToken(): Promise<string | null> {
+    const db = await getDb();
+    const session = await db.getFirstAsync<{ syncToken: string | null }>(
+      'SELECT syncToken FROM active_session'
+    );
+    return session?.syncToken || null;
+  }
+
+  static async clearSyncToken(): Promise<void> {
+    const db = await getDb();
+    await db.runAsync('UPDATE active_session SET syncToken = NULL');
+  }
+
   static async hasUsers(): Promise<boolean> {
     const db = await getDb();
     const result = await db.getFirstAsync<{ count: number }>(
