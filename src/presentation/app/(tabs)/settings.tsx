@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { View, Text, ScrollView, Pressable, StyleSheet, Switch, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as SecureStore from 'expo-secure-store';
 import { ScreenContainer } from '@/components/screen-container';
 import { useColors } from '@/hooks/use-colors';
 import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
@@ -13,6 +14,9 @@ import { SyncDevice } from '@shared/sync/types';
 import { DeviceInfo } from 'react-native-device-info';
 import { queryClient } from '@shared/lib/query-client';
 import { SqlConsole } from '@/components/dev/SqlConsole';
+
+const SYNC_USERNAME_KEY = 'sync_username';
+const SYNC_PASSWORD_KEY = 'sync_password';
 
 export default function SettingsScreen() {
   const { data: settings } = useSettings();
@@ -28,10 +32,13 @@ export default function SettingsScreen() {
   const [desktopConnected, setDesktopConnected] = useState(false);
   const [syncModalVisible, setSyncModalVisible] = useState(false);
   const [sqlConsoleVisible, setSqlConsoleVisible] = useState(false);
+  const [needsAuth, setNeedsAuth] = useState(false);
+  const [defaultAuthUsername, setDefaultAuthUsername] = useState('');
 
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const discoveryRef = useRef<DeviceDiscoveryService | null>(null);
+  const desktopIpRef = useRef<string | null>(null);
 
   useEffect(() => {
     const discovery = new DeviceDiscoveryService();
@@ -64,7 +71,9 @@ export default function SettingsScreen() {
     };
   }, [syncManager]);
 
-  const handleOpenSync = useCallback(() => {
+  const handleOpenSync = useCallback(async () => {
+    const session = await AuthService.getSession();
+    setDefaultAuthUsername(session?.username || '');
     setSyncModalVisible(true);
   }, []);
 
@@ -80,7 +89,21 @@ export default function SettingsScreen() {
 
   const handleCloseSync = useCallback(() => {
     setSyncModalVisible(false);
+    setNeedsAuth(false);
   }, []);
+
+  const tryAutoAuth = useCallback(async (): Promise<boolean> => {
+    try {
+      const savedUsername = await SecureStore.getItemAsync(SYNC_USERNAME_KEY);
+      const savedPassword = await SecureStore.getItemAsync(SYNC_PASSWORD_KEY);
+      if (savedUsername && savedPassword) {
+        await syncManager.authenticate(savedUsername, savedPassword);
+        return true;
+      }
+    } catch {
+    }
+    return false;
+  }, [syncManager]);
 
   const handleConnect = useCallback(async (deviceId: string) => {
     const discovery = discoveryRef.current;
@@ -98,9 +121,19 @@ export default function SettingsScreen() {
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
+        desktopIpRef.current = selectedDevice.ip;
         const adapter = new LocalP2PSyncAdapter(deviceName, discovery);
         adapter.setDesktopIp(selectedDevice.ip);
         await syncManager.initialize(adapter);
+        await syncManager.connect();
+
+        const authed = await tryAutoAuth();
+        if (authed) {
+          setSyncStatus('connected');
+          setDesktopConnected(true);
+        }
+        setNeedsAuth(!authed);
+
         lastError = null;
         break;
       } catch (err) {
@@ -112,7 +145,24 @@ export default function SettingsScreen() {
     }
 
     if (lastError) throw lastError;
-  }, [syncManager, devices]);
+  }, [syncManager, devices, tryAutoAuth]);
+
+  const handleAuthenticate = useCallback(async (username: string, password: string) => {
+    const result = await syncManager.authenticate(username, password);
+    await AuthService.createSessionFromUser(result.user, result.token);
+    await SecureStore.setItemAsync(SYNC_USERNAME_KEY, username);
+    await SecureStore.setItemAsync(SYNC_PASSWORD_KEY, password);
+    setSyncStatus('connected');
+    setDesktopConnected(true);
+    setNeedsAuth(false);
+  }, [syncManager]);
+
+  const handleDisconnect = useCallback(async () => {
+    await syncManager.disconnect();
+    setSyncStatus('idle');
+    setDesktopConnected(false);
+    setNeedsAuth(false);
+  }, [syncManager]);
 
   const handleSync = useCallback(async () => {
     if (syncStatus !== 'connected') return;
@@ -132,9 +182,13 @@ export default function SettingsScreen() {
           await syncManager.disconnect();
           const deviceName = await DeviceInfo.getDeviceName();
           const discovery = discoveryRef.current;
-          if (discovery) {
+          const ip = desktopIpRef.current;
+          if (discovery && ip) {
             const adapter = new LocalP2PSyncAdapter(deviceName, discovery);
+            adapter.setDesktopIp(ip);
             await syncManager.initialize(adapter);
+            await syncManager.connect();
+            await tryAutoAuth();
           }
         }
       }
@@ -179,6 +233,8 @@ export default function SettingsScreen() {
           style: 'destructive',
           onPress: async () => {
             await AuthService.logout();
+            await SecureStore.deleteItemAsync(SYNC_USERNAME_KEY);
+            await SecureStore.deleteItemAsync(SYNC_PASSWORD_KEY);
             router.replace('/(auth)/login');
           },
         },
@@ -274,10 +330,14 @@ export default function SettingsScreen() {
         onConnect={handleConnect}
         onSync={handleSync}
         onScan={handleScanDevices}
+        onAuthenticate={handleAuthenticate}
+        onDisconnect={handleDisconnect}
         devices={devices}
         connected={syncStatus === 'connected'}
+        needsAuth={needsAuth}
         syncStatus={syncStatus === 'reconnecting' ? 'idle' : syncStatus}
         error={errorMsg}
+        defaultUsername={defaultAuthUsername}
       />
 
       <SqlConsole

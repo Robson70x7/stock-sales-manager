@@ -8,6 +8,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
+  TextInput,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
@@ -33,10 +34,14 @@ interface SyncModalProps {
   onConnect: (deviceId: string) => Promise<void>;
   onSync: () => Promise<SyncResult | void>;
   onScan: () => Promise<void>;
+  onAuthenticate: (username: string, password: string) => Promise<void>;
+  onDisconnect: () => Promise<void>;
   devices: SyncDevice[];
   connected: boolean;
+  needsAuth: boolean;
   syncStatus: 'idle' | 'syncing' | 'connected' | 'error';
   error?: string;
+  defaultUsername?: string;
 }
 
 export function SyncModal({
@@ -45,17 +50,26 @@ export function SyncModal({
   onConnect,
   onSync,
   onScan,
+  onAuthenticate,
+  onDisconnect,
   devices,
   connected,
+  needsAuth,
   syncStatus,
   error,
+  defaultUsername,
 }: SyncModalProps) {
   const colors = useColors();
   const [selectedDevice, setSelectedDevice] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const [disconnecting, setDisconnecting] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
+  const [authUsername, setAuthUsername] = useState('');
+  const [authPassword, setAuthPassword] = useState('');
+  const [authing, setAuthing] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible) {
@@ -63,9 +77,16 @@ export function SyncModal({
       setScanning(false);
       setConnecting(false);
       setSyncing(false);
+      setDisconnecting(false);
       setSyncResult(null);
+      setAuthUsername('');
+      setAuthPassword('');
+      setAuthing(false);
+      setAuthError(null);
+    } else if (defaultUsername) {
+      setAuthUsername(defaultUsername);
     }
-  }, [visible]);
+  }, [visible, defaultUsername]);
 
   useEffect(() => {
     if (devices.length === 1 && !selectedDevice) {
@@ -96,6 +117,35 @@ export function SyncModal({
     }
   };
 
+  const handleAuthenticateSubmit = async () => {
+    if (!authUsername.trim() || !authPassword.trim()) {
+      setAuthError('Preencha usuário e senha');
+      return;
+    }
+
+    setAuthing(true);
+    setAuthError(null);
+    try {
+      await onAuthenticate(authUsername.trim(), authPassword.trim());
+      setAuthPassword('');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Falha na autenticação';
+      setAuthError(message);
+    } finally {
+      setAuthing(false);
+    }
+  };
+
+  const handleDisconnectAction = async () => {
+    setDisconnecting(true);
+    try {
+      await onDisconnect();
+    } catch {
+    } finally {
+      setDisconnecting(false);
+    }
+  };
+
   const handleSync = async () => {
     setSyncing(true);
     setSyncResult(null);
@@ -107,6 +157,59 @@ export function SyncModal({
     } finally {
       setSyncing(false);
     }
+  };
+
+  const isConnectedAndAuthed = connected && !needsAuth;
+
+  const renderStatusBadge = () => {
+    if (syncStatus === 'syncing') {
+      return (
+        <>
+          <ActivityIndicator size="small" color={colors.primary} />
+          <Text style={[styles.statusText, { color: colors.primary }]}>
+            Sincronizando...
+          </Text>
+        </>
+      );
+    }
+    if (syncStatus === 'connected' && needsAuth) {
+      return (
+        <>
+          <MaterialIcons name="warning" size={16} color="#eab308" />
+          <Text style={[styles.statusText, { color: '#eab308' }]}>
+            Autenticação necessária
+          </Text>
+        </>
+      );
+    }
+    if (syncStatus === 'connected') {
+      return (
+        <>
+          <MaterialIcons name="check-circle" size={16} color="#10b981" />
+          <Text style={[styles.statusText, { color: '#10b981' }]}>
+            Conectado
+          </Text>
+        </>
+      );
+    }
+    if (syncStatus === 'idle') {
+      return (
+        <>
+          <MaterialIcons name="radio-button-unchecked" size={16} color={colors.muted} />
+          <Text style={[styles.statusText, { color: colors.muted }]}>
+            Desconectado
+          </Text>
+        </>
+      );
+    }
+    return (
+      <>
+        <MaterialIcons name="error" size={16} color="#ef4444" />
+        <Text style={[styles.statusText, { color: '#ef4444' }]}>
+          Erro
+        </Text>
+      </>
+    );
   };
 
   return (
@@ -132,38 +235,7 @@ export function SyncModal({
             <View style={styles.statusRow}>
               <Text style={[styles.label, { color: colors.muted }]}>Status:</Text>
               <View style={styles.statusBadge}>
-                {syncStatus === 'syncing' && (
-                  <>
-                    <ActivityIndicator size="small" color={colors.primary} />
-                    <Text style={[styles.statusText, { color: colors.primary }]}>
-                      Sincronizando...
-                    </Text>
-                  </>
-                )}
-                {syncStatus === 'connected' && (
-                  <>
-                    <MaterialIcons name="check-circle" size={16} color="#10b981" />
-                    <Text style={[styles.statusText, { color: '#10b981' }]}>
-                      Conectado
-                    </Text>
-                  </>
-                )}
-                {syncStatus === 'idle' && (
-                  <>
-                    <MaterialIcons name="radio-button-unchecked" size={16} color={colors.muted} />
-                    <Text style={[styles.statusText, { color: colors.muted }]}>
-                      Desconectado
-                    </Text>
-                  </>
-                )}
-                {syncStatus === 'error' && (
-                  <>
-                    <MaterialIcons name="error" size={16} color="#ef4444" />
-                    <Text style={[styles.statusText, { color: '#ef4444' }]}>
-                      Erro
-                    </Text>
-                  </>
-                )}
+                {renderStatusBadge()}
               </View>
             </View>
           </View>
@@ -172,6 +244,58 @@ export function SyncModal({
             <View style={[styles.errorCard, { backgroundColor: '#7f1d1d' }]}>
               <MaterialIcons name="error-outline" size={20} color="#fca5a5" />
               <Text style={[styles.errorText, { color: '#fca5a5' }]}>{error}</Text>
+            </View>
+          )}
+
+          {/* Autenticação */}
+          {connected && needsAuth && (
+            <View style={[styles.authCard, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.authTitle, { color: colors.foreground }]}>
+                Autenticação necessária
+              </Text>
+              <Text style={[styles.authDescription, { color: colors.muted }]}>
+                Informe suas credenciais do Desktop para autenticar a conexão.
+              </Text>
+
+              {authError && (
+                <View style={[styles.authErrorBox, { backgroundColor: '#7f1d1d' }]}>
+                  <Text style={[styles.authErrorText, { color: '#fca5a5' }]}>{authError}</Text>
+                </View>
+              )}
+
+              <View style={styles.authFields}>
+                <View>
+                  <Text style={[styles.authLabel, { color: colors.muted }]}>Usuário</Text>
+                  <TextInput
+                    value={authUsername}
+                    onChangeText={(t) => { setAuthUsername(t); setAuthError(null); }}
+                    placeholder="Digite seu usuário do Desktop"
+                    placeholderTextColor={colors.muted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    editable={!authing}
+                    style={[
+                      styles.authInput,
+                      { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border },
+                    ]}
+                  />
+                </View>
+                <View>
+                  <Text style={[styles.authLabel, { color: colors.muted }]}>Senha</Text>
+                  <TextInput
+                    value={authPassword}
+                    onChangeText={(t) => { setAuthPassword(t); setAuthError(null); }}
+                    placeholder="Digite sua senha"
+                    placeholderTextColor={colors.muted}
+                    secureTextEntry
+                    editable={!authing}
+                    style={[
+                      styles.authInput,
+                      { backgroundColor: colors.background, color: colors.foreground, borderColor: colors.border },
+                    ]}
+                  />
+                </View>
+              </View>
             </View>
           )}
 
@@ -310,22 +434,61 @@ export function SyncModal({
           >
             <Text style={[styles.btnText, { color: colors.foreground }]}>Cancelar</Text>
           </Pressable>
-          {connected ? (
+          {isConnectedAndAuthed ? (
+            <>
+              <Pressable
+                onPress={handleDisconnectAction}
+                disabled={disconnecting}
+                style={[
+                  styles.btn,
+                  {
+                    backgroundColor: 'transparent',
+                    borderWidth: 1,
+                    borderColor: colors.primary,
+                    opacity: disconnecting ? 0.5 : 1,
+                  },
+                ]}
+              >
+                {disconnecting ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Text style={[styles.btnText, { color: colors.primary }]}>Desconectar</Text>
+                )}
+              </Pressable>
+              <Pressable
+                onPress={handleSync}
+                disabled={syncing}
+                style={[
+                  styles.btn,
+                  {
+                    backgroundColor: colors.primary,
+                    opacity: syncing ? 0.5 : 1,
+                  },
+                ]}
+              >
+                {syncing ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <Text style={[styles.btnText, { color: 'white' }]}>Sincronizar</Text>
+                )}
+              </Pressable>
+            </>
+          ) : connected && needsAuth ? (
             <Pressable
-              onPress={handleSync}
-              disabled={syncing}
+              onPress={handleAuthenticateSubmit}
+              disabled={authing}
               style={[
                 styles.btn,
                 {
                   backgroundColor: colors.primary,
-                  opacity: syncing ? 0.5 : 1,
+                  opacity: authing ? 0.5 : 1,
                 },
               ]}
             >
-              {syncing ? (
+              {authing ? (
                 <ActivityIndicator size="small" color="white" />
               ) : (
-                <Text style={[styles.btnText, { color: 'white' }]}>Sincronizar</Text>
+                <Text style={[styles.btnText, { color: 'white' }]}>Autenticar</Text>
               )}
             </Pressable>
           ) : (
@@ -416,6 +579,43 @@ const styles = StyleSheet.create({
   errorText: {
     flex: 1,
     fontSize: 13,
+  },
+  authCard: {
+    padding: 16,
+    borderRadius: 8,
+  },
+  authTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  authDescription: {
+    fontSize: 13,
+    marginBottom: 12,
+    lineHeight: 18,
+  },
+  authErrorBox: {
+    padding: 10,
+    borderRadius: 6,
+    marginBottom: 12,
+  },
+  authErrorText: {
+    fontSize: 13,
+  },
+  authFields: {
+    gap: 12,
+  },
+  authLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  authInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
   },
   sectionHeader: {
     flexDirection: 'row',

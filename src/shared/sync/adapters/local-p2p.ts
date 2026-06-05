@@ -151,6 +151,7 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
         type: 'auth_request',
         username,
         password,
+        deviceId: this.deviceId,
       };
       this.ws!.send(JSON.stringify(authMsg));
     });
@@ -168,6 +169,12 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
         pending.resolve(message);
       }
       return;
+    }
+
+    // Erro global sem correlationId: desktop invalida sessão
+    if (message.type === 'error' && this.pendingRequests.size > 0) {
+      const errMsg = message.message || 'Erro do desktop';
+      this.rejectAllPending(new Error(errMsg));
     }
 
     const syncMessage: SyncMessage = {
@@ -248,5 +255,9 @@ export class LocalP2PSyncAdapter extends BaseSyncAdapter {
 
   setDesktopIp(ip: string): void {
     this.desktopIp = ip;
+  }
+
+  setToken(token: string): void {
+    this.authToken = token;
   }
 }

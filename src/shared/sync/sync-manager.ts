@@ -16,6 +16,51 @@ export class SyncManager {
   };
   private stateCallbacks: ((state: SyncState) => void)[] = [];
 
+  setAuthToken(token: string): void {
+    if (!this.adapter || !(this.adapter instanceof LocalP2PSyncAdapter)) {
+      throw new Error('Adaptador não é LocalP2PSyncAdapter');
+    }
+    (this.adapter as LocalP2PSyncAdapter).setToken(token);
+  }
+
+  async authenticate(username: string, password: string): Promise<{
+    token: string;
+    user: { id: string; name: string; username: string; roleName: string; permissions: string[] };
+    encryptionSalt: string;
+  }> {
+    if (!this.adapter || !(this.adapter instanceof LocalP2PSyncAdapter)) {
+      throw new Error('Adaptador não é LocalP2PSyncAdapter');
+    }
+
+    const adapter = this.adapter as LocalP2PSyncAdapter;
+    try {
+      this.updateState({ status: 'connected', error: 'Autenticando...' });
+      const result = await adapter.authenticate(username, password);
+      this.updateState({ status: 'connected', error: undefined });
+      return result;
+    } catch (error) {
+      this.updateState({
+        status: 'error',
+        error: `${error}`,
+      });
+      throw error;
+    }
+  }
+
+  async connect(): Promise<void> {
+    if (!this.adapter) throw new Error('Adaptador não inicializado');
+    try {
+      await this.adapter.connect();
+      this.updateState({ status: 'connected', error: undefined });
+    } catch (error) {
+      this.updateState({
+        status: 'error',
+        error: `Erro ao conectar: ${error}`,
+      });
+      throw error;
+    }
+  }
+
   async initialize(adapter: BaseSyncAdapter): Promise<void> {
     this.adapter = adapter;
     this.state.strategy = adapter.name;
@@ -221,6 +266,10 @@ export class SyncManager {
         break;
       case 'error':
         console.error('[SyncManager] Erro recebido do desktop:', desktopMsg.message || desktopMsg);
+        this.updateState({
+          status: 'error',
+          error: desktopMsg.message || 'Erro recebido do desktop',
+        });
         break;
     }
   }
