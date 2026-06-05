@@ -40,9 +40,9 @@ export class SaleRepository implements ISaleRepository {
 
     const rows = await database.getAllAsync<db.DbSale>(
       `SELECT * FROM sales WHERE isDeleted = 0 AND (
-        (saleDate >= ? AND saleDate <= ?) OR EXISTS (
+        (DATE(saleDate) >= ? AND DATE(saleDate) <= ?) OR EXISTS (
           SELECT 1 FROM installments WHERE saleId = sales.id AND isDeleted = 0 AND (
-            (dueDate >= ? AND dueDate <= ?) OR (paidDate >= ? AND paidDate <= ?)
+            (DATE(dueDate) >= ? AND DATE(dueDate) <= ?) OR (DATE(paidDate) >= ? AND DATE(paidDate) <= ?)
           )
         )
       ) ORDER BY saleDate DESC`,
