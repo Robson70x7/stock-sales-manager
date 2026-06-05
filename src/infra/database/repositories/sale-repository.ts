@@ -10,6 +10,7 @@ export class SaleRepository implements ISaleRepository {
     if (!row) return null;
     const items = await db.getSaleItems(id);
     const installments = await db.getInstallments(id);
+    console.log('installments no findById:', { installments });
     return Sale.fromDb(
       row,
       items.map(SaleItem.fromDb),

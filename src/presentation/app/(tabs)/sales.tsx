@@ -98,8 +98,8 @@ export default function SalesScreen() {
   // Gera SummaryItems a partir das vendas do mês
   const summaryItems = useMemo((): SummaryItem[] => {
     const items: SummaryItem[] = [];
-
     monthSales.forEach(sale => {
+      console.log('InstallmentCount da venda:', {installmentsCount: sale.installmentsCount });
       if (sale.installmentsCount <= 1) {
         if (isInMonth(sale.saleDate, currentYear, currentMonth)) {
           items.push({
@@ -119,10 +119,19 @@ export default function SalesScreen() {
           });
         }
       } else {
+        console.log('Processando venda com parcelas:', { saleId: sale.id, installments: sale.installments });
         sale.installments.forEach(inst => {
           const showInMonth = inst.status === 'paid'
             ? isInMonth(inst.paidDate as string, currentYear, currentMonth)
             : isInMonth(inst.dueDate, currentYear, currentMonth);
+            console.log('Verificando parcela:', {
+              installmentId: inst.id,
+              dueDate: inst.dueDate,
+              paidDate: inst.paidDate,
+              currentYear,
+              currentMonth,
+              showInMonth,
+            });
           if (showInMonth) {
             items.push({
               id: inst.id,
@@ -148,12 +157,13 @@ export default function SalesScreen() {
         });
       }
     });
-
+    console.log('Summary items gerados:', { summaryItems: items });
     return items;
   }, [monthSales, currentYear, currentMonth]);
 
   // Filtra conforme a tab ativa
   const tabFiltered = useMemo(() => {
+    console.log('Filtrando por tab:', {summaryItems});
     if (activeTab === 'vendas') return summaryItems;
     // "A Receber": só itens não pagos
     return summaryItems.filter(i => i.status !== 'paid');
@@ -162,7 +172,7 @@ export default function SalesScreen() {
   // Aplicar busca, filtros e ordenação
   const filteredItems = useMemo(() => {
     let result = tabFiltered;
-
+    console.log('Resulta ANTES:', { result });
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(item =>
@@ -190,7 +200,7 @@ export default function SalesScreen() {
         default: return new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime();
       }
     });
-
+    console.log('Resulta DEPOIS:', { result });
     return result;
   }, [tabFiltered, search, filterPayment, filterStatus, sortBy, tags]);
 

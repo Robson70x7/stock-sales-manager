@@ -359,7 +359,7 @@ export class Sale {
     quantity: number; unitPrice: number; totalPrice: number;
     costAtSale: number | null; profitAmount: number | null; status: string;
   }> {
-    return this.items.map(item => item.toDb());
+    return this.items.map(item => ({ ...item.toDb(), saleId: this.id }));
   }
 
   toDbInstallments(): Array<{
@@ -369,7 +369,7 @@ export class Sale {
   }> {
     return this.installments.map(inst => ({
       id: inst.id,
-      saleId: inst.saleId,
+      saleId: this.id,
       number: inst.number,
       totalInstallments: inst.totalInstallments,
       amount: inst.amount,
