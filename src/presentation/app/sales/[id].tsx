@@ -6,7 +6,7 @@ import { useColors } from '@/hooks/use-colors';
 import { useSale } from '@/hooks/useSale';
 import { useTags } from '@/hooks/useTags';
 import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
-import { useDeleteSale } from '@/hooks/useDeleteSale';
+import { useCancelSale } from '@/hooks/useCancelSale';
 import { useUpdateInstallment } from '@/hooks/useUpdateInstallment';
 import { TagChip } from '@/components/ui/TagChip';
 import { SaleStatusBadge, InstallmentStatusBadge } from '@/components/ui/StatusBadge';
@@ -20,7 +20,7 @@ export default function SaleDetailScreen() {
   const { data: settings } = useSettings();
   const { data: sale, isLoading } = useSale(id);
   const { data: allTags = [] } = useTags();
-  const { mutateAsync: deleteSale } = useDeleteSale();
+  const { mutateAsync: cancelSale } = useCancelSale();
   const { mutateAsync: updateInstallment } = useUpdateInstallment();
   const { mutateAsync: updateSettings } = useUpdateSettings();
   const colors = useColors();
@@ -45,15 +45,15 @@ export default function SaleDetailScreen() {
   const paidAmount = sale.installments.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
   const pendingAmount = sale.totalAmount - paidAmount;
 
-  const handleDelete = async (returnStock: boolean = false) => {
+  const handleCancel = async (returnStock: boolean = false) => {
     if (dontAskAgain) {
       await updateSettings({ askReturnStockOnDelete: false });
     }
-    await deleteSale({ id: sale.id, returnStock });
+    await cancelSale({ id: sale.id, returnStock });
     router.back();
   };
 
-  const handleDeletePress = () => {
+  const handleCancelPress = () => {
     if (settings?.askReturnStockOnDelete ?? true) {
       setShowReturnStock(true);
     } else {
@@ -233,11 +233,11 @@ export default function SaleDetailScreen() {
             <Text style={styles.editBtnText}>Editar</Text>
           </Pressable>
           <Pressable
-            onPress={handleDeletePress}
+            onPress={handleCancelPress}
             style={({ pressed }) => [styles.deleteBtn, { borderColor: '#DC2626' }, pressed && { opacity: 0.7 }]}
           >
-            <MaterialIcons name="delete" size={18} color="#DC2626" />
-            <Text style={[styles.deleteBtnText, { color: '#DC2626' }]}>Excluir</Text>
+            <MaterialIcons name="cancel" size={18} color="#DC2626" />
+            <Text style={[styles.deleteBtnText, { color: '#DC2626' }]}>Cancelar</Text>
           </Pressable>
         </View>
       </View>
@@ -249,7 +249,7 @@ export default function SaleDetailScreen() {
         confirmLabel="Devolver"
         onConfirm={() => {
           setShowReturnStock(false);
-          handleDelete(true);
+          handleCancel(true);
         }}
         onCancel={() => {
           setShowReturnStock(false);
@@ -264,11 +264,11 @@ export default function SaleDetailScreen() {
 
       <ConfirmDialog
         visible={showDelete}
-        title="Excluir Venda"
-        message={`Deseja excluir esta venda? Esta ação não pode ser desfeita.`}
-        confirmLabel="Excluir"
+        title="Cancelar Venda"
+        message={`Deseja cancelar esta venda? O status será alterado para cancelado.`}
+        confirmLabel="Cancelar"
         destructive
-        onConfirm={() => handleDelete(false)}
+        onConfirm={() => handleCancel(false)}
         onCancel={() => setShowDelete(false)}
       />
     </ScrollView>

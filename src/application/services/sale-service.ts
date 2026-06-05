@@ -78,5 +78,18 @@ export class SaleService {
     const sale = await this.saleRepo.findById(saleId);
     if (!sale) throw new SaleNotFoundError(saleId);
     await this.saleRepo.saveInstallment(installment.toDb());
+
+    const allInst = await this.saleRepo.getInstallments(saleId);
+    const newStatus = SaleService.determineSaleStatus(allInst);
+    await this.saleRepo.updateStatus(saleId, newStatus);
+  }
+
+  static determineSaleStatus(installments: { status: string }[]): string {
+    if (installments.length === 0) return 'pending';
+    const allPaid = installments.every(i => i.status === 'paid' || i.status === 'cancelled');
+    const anyPaid = installments.some(i => i.status === 'paid');
+    if (allPaid) return 'paid';
+    if (anyPaid) return 'partial';
+    return 'pending';
   }
 }

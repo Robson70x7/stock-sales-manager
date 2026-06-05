@@ -499,6 +499,14 @@ export async function updateSaleSyncStatus(
   );
 }
 
+export async function updateSaleStatus(saleId: string, status: string): Promise<void> {
+  const database = await getDb();
+  await database.runAsync(
+    `UPDATE sales SET status = ?, updatedAt = ? WHERE id = ?`,
+    [status, new Date().toISOString(), saleId]
+  );
+}
+
 // ============================================================
 // INSTALLMENTS
 // ============================================================

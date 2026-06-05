@@ -87,4 +87,16 @@ export class SaleRepository implements ISaleRepository {
   }): Promise<void> {
     await db.saveInstallment(installment);
   }
+
+  async getInstallments(saleId: string): Promise<{
+    id: string; saleId: string; number: number; totalInstallments: number;
+    amount: number; dueDate: string; paidDate: string | null;
+    status: string; history: string; type: string;
+  }[]> {
+    return db.getInstallments(saleId);
+  }
+
+  async updateStatus(saleId: string, status: string): Promise<void> {
+    await db.updateSaleStatus(saleId, status);
+  }
 }

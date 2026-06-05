@@ -47,20 +47,14 @@ export function formatDateISO(year: number, month: number, day: number): string 
 
 // Formata data para exibição
 export function formatDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  // Adiciona o offset do timezone local para corrigir o problema de 1 dia atrasado
-  const offset = date.getTimezoneOffset() * 60000;
-  const localDate = new Date(date.getTime() + offset);
-  return localDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const [y, m, d] = dateStr.split('T')[0].split('-');
+  return `${d}/${m}/${y}`;
 }
 
 // Formata data curta (dd/mm)
 export function formatShortDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  // Adiciona o offset do timezone local para corrigir o problema de 1 dia atrasado
-  const offset = date.getTimezoneOffset() * 60000;
-  const localDate = new Date(date.getTime() + offset);
-  return localDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const [y, m, d] = dateStr.split('T')[0].split('-');
+  return `${d}/${m}`;
 }
 
 // Nome do mês em português
@@ -152,26 +146,26 @@ export function generateInstallmentsWithEntry(
   const remaining = totalAmount - entryAmount;
   const remainingCount = count;
   const installmentAmount = remainingCount > 0 ? Math.round((remaining / remainingCount) * 100) / 100 : 0;
-  const start = new Date(startDate);
-  const offset = start.getTimezoneOffset() * 60000;
-  const localStart = new Date(start.getTime() + offset);
+  const [yearStr, monthStr, dayStr] = startDate.split('-');
+  const baseYear = parseInt(yearStr, 10);
+  const baseMonth = parseInt(monthStr, 10) - 1; // 0-indexed
+  const baseDay = parseInt(dayStr, 10);
 
   const installments: import('@shared/types').Installment[] = [];
 
   // Parcela de entrada (número 0, vence na data inicial)
-  const entryDue = new Date(localStart);
-  const utcEntry = new Date(entryDue.getTime() - offset);
+  const nowISO = new Date().toISOString();
   installments.push({
     id: generateId(),
     saleId: '',
     number: 0,
     totalInstallments: count,
     amount: entryAmount,
-    dueDate: utcEntry.toISOString(),
+    dueDate: `${formatDateISO(baseYear, baseMonth, baseDay)}T00:00:00.000Z`,
     status: 'paid' as const,
-    paidDate: new Date().toISOString(),
+    paidDate: nowISO,
     history: [{
-      date: new Date().toISOString(),
+      date: nowISO,
       status: 'paid' as const,
       notes: 'Entrada',
     }],
@@ -180,19 +174,18 @@ export function generateInstallmentsWithEntry(
 
   // Demais parcelas
   for (let i = 1; i <= count; i++) {
-    const dueDate = new Date(localStart);
+    const dueDate = new Date(baseYear, baseMonth, baseDay);
     dueDate.setMonth(dueDate.getMonth() + i);
-    const utcDueDate = new Date(dueDate.getTime() - offset);
     installments.push({
       id: generateId(),
       saleId: '',
       number: i,
       totalInstallments: count,
       amount: installmentAmount,
-      dueDate: utcDueDate.toISOString(),
+      dueDate: `${formatDateISO(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())}T00:00:00.000Z`,
       status: 'pending' as const,
       history: [{
-        date: new Date().toISOString(),
+        date: nowISO,
         status: 'pending' as const,
         notes: 'Parcela criada',
       }],
@@ -215,33 +208,31 @@ export function getMovementTypeLabel(type: StockMovementType): string {
 }
 
 // Gera parcelas automaticamente
-// saleId será preenchido pelo contexto antes de salvar
 export function generateInstallments(
   totalAmount: number,
   count: number,
   startDate: string
 ): import('@shared/types').Installment[] {
   const installmentAmount = totalAmount / count;
-  const start = new Date(startDate);
-  // Corrigir timezone: adicionar offset para manter a data local correta
-  const offset = start.getTimezoneOffset() * 60000;
-  const localStart = new Date(start.getTime() + offset);
-  
+  const [yearStr, monthStr, dayStr] = startDate.split('-');
+  const baseYear = parseInt(yearStr, 10);
+  const baseMonth = parseInt(monthStr, 10) - 1;
+  const baseDay = parseInt(dayStr, 10);
+  const nowISO = new Date().toISOString();
+
   return Array.from({ length: count }, (_, i) => {
-    const dueDate = new Date(localStart);
+    const dueDate = new Date(baseYear, baseMonth, baseDay);
     dueDate.setMonth(dueDate.getMonth() + i);
-    // Remover o offset ao converter de volta para ISO para armazenar corretamente
-    const utcDueDate = new Date(dueDate.getTime() - offset);
     return {
       id: generateId(),
-      saleId: '', // será preenchido pelo contexto
+      saleId: '',
       number: i + 1,
       totalInstallments: count,
       amount: Math.round(installmentAmount * 100) / 100,
-      dueDate: utcDueDate.toISOString(),
+      dueDate: `${formatDateISO(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate())}T00:00:00.000Z`,
       status: 'pending' as const,
       history: [{
-        date: new Date().toISOString(),
+        date: nowISO,
         status: 'pending' as const,
         notes: 'Parcela criada',
       }],
@@ -252,11 +243,8 @@ export function generateInstallments(
 
 // Verifica se uma data está no mês/ano especificado
 export function isInMonth(dateStr: string, year: number, month: number): boolean {
-  const date = new Date(dateStr);
-  // Adiciona o offset do timezone local para corrigir o problema de 1 dia atrasado
-  const offset = date.getTimezoneOffset() * 60000;
-  const localDate = new Date(date.getTime() + offset);
-  return localDate.getFullYear() === year && localDate.getMonth() === month;
+  const d = dateStr.split('T')[0].split('-');
+  return parseInt(d[0], 10) === year && parseInt(d[1], 10) - 1 === month;
 }
 
 // Obtém iniciais do nome

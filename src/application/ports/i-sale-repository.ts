@@ -11,4 +11,10 @@ export interface ISaleRepository {
     amount: number; dueDate: string; paidDate: string | null;
     status: string; history: string; type: string;
   }): Promise<void>;
+  getInstallments(saleId: string): Promise<{
+    id: string; saleId: string; number: number; totalInstallments: number;
+    amount: number; dueDate: string; paidDate: string | null;
+    status: string; history: string; type: string;
+  }[]>;
+  updateStatus(saleId: string, status: string): Promise<void>;
 }

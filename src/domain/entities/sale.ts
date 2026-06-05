@@ -314,6 +314,7 @@ export class Sale {
     return new Sale({
       ...this,
       status: 'cancelled',
+      syncStatus: this.syncStatus === 'synced' ? 'pending' : this.syncStatus,
       updatedAt: new Date().toISOString(),
     });
   }
