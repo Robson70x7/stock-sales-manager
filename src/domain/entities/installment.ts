@@ -1,4 +1,4 @@
-export type InstallmentStatus = 'pending' | 'paid' | 'overdue';
+export type InstallmentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
 export type InstallmentType = 'normal' | 'entry';
 
 export interface InstallmentHistory {
@@ -89,6 +89,17 @@ export class Installment {
   get isOverdue(): boolean {
     if (this.status === 'paid') return false;
     return new Date(this.dueDate) < new Date();
+  }
+
+  cancel(): Installment {
+    return new Installment({
+      ...this,
+      status: 'cancelled',
+      history: [
+        ...this.history,
+        { date: new Date().toISOString(), status: 'cancelled' as const, notes: 'Parcela cancelada' },
+      ],
+    });
   }
 
   pay(paidDate?: string): Installment {

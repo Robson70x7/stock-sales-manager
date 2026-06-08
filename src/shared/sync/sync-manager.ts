@@ -1,9 +1,10 @@
 import { BaseSyncAdapter } from './sync-adapter';
 import { SyncState, SyncConflict, SyncMessage, DesktopSyncMessage } from './types';
-import { getSetting, saveSetting } from '@infra/database/db';
+import { getSetting, saveSetting, getDb } from '@infra/database/db';
 import { SaleRepository } from '@infra/database/repositories/sale-repository';
 import { pullCatalog, applyPullResult } from './handlers/pull-handler';
 import { sendSale, processAck } from './handlers/sale-handler';
+import { sendClient } from './handlers/client-handler';
 import { LocalP2PSyncAdapter } from './adapters/local-p2p';
 
 export class SyncManager {
@@ -120,6 +121,7 @@ export class SyncManager {
 
   async syncAll(): Promise<{
     products: number; clients: number; tags: number; suppliers: number;
+    clientsSent: number;
     sales: number;
   }> {
     if (!this.adapter || !(this.adapter instanceof LocalP2PSyncAdapter)) {
@@ -129,6 +131,7 @@ export class SyncManager {
     const adapter = this.adapter as LocalP2PSyncAdapter;
     const result = {
       products: 0, clients: 0, tags: 0, suppliers: 0,
+      clientsSent: 0,
       sales: 0,
     };
 
@@ -150,6 +153,18 @@ export class SyncManager {
       this.updateState({ status: 'syncing', error: 'Sincronizando fornecedores...' });
       const suppliersSince = await getSetting('last_sync_timestamp_suppliers');
       result.suppliers = await pullCatalog(adapter, 'suppliers', suppliersSince || undefined);
+
+      // Send pending clients before sales
+      this.updateState({ status: 'syncing', error: 'Enviando clientes pendentes...' });
+      const pendingClients = await this.getPendingClients();
+      for (const client of pendingClients) {
+        try {
+          await sendClient(adapter, client);
+          result.clientsSent++;
+        } catch (err) {
+          console.error(`[SyncManager] Erro ao enviar cliente ${client.id}:`, err);
+        }
+      }
 
       // Send pending sales
       this.updateState({ status: 'syncing', error: 'Enviando vendas pendentes...' });
@@ -186,6 +201,18 @@ export class SyncManager {
       const repo = new SaleRepository();
       const sales = await repo.findAll();
       return sales.filter(s => s.syncStatus !== 'synced');
+    } catch {
+      return [];
+    }
+  }
+
+  async getPendingClients(): Promise<any[]> {
+    try {
+      const db = await getDb();
+      const rows = await db.getAllAsync<any>(
+        `SELECT * FROM clients WHERE syncStatus = 'pending'`
+      );
+      return rows;
     } catch {
       return [];
     }

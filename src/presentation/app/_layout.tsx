@@ -85,6 +85,8 @@ export default function RootLayout() {
             <Stack.Screen name="sales/edit/[id]" options={{ title: "Editar Venda", presentation: "fullScreenModal", ...headerOptions }} />
             <Stack.Screen name="products/[id]" options={{ title: "Detalhes do Produto", ...headerOptions }} />
             <Stack.Screen name="clients/[id]" options={{ title: "Detalhes do Cliente", ...headerOptions }} />
+            <Stack.Screen name="clients/new" options={{ title: "Novo Cliente", presentation: "modal", ...headerOptions }} />
+            <Stack.Screen name="clients/edit/[id]" options={{ title: "Editar Cliente", presentation: "modal", ...headerOptions }} />
             <Stack.Screen name="tags/index" options={{ title: "Tags", ...headerOptions }} />
           </Stack>
       </QueryClientProvider>

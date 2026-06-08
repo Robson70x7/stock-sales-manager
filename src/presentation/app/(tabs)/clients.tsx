@@ -9,13 +9,17 @@ import { getInitials, formatCurrency } from '@shared/lib/utils';
 import { Client } from '@shared/types';
 import { useClients } from '@/hooks/useClients';
 import { useAllSales } from '@/hooks/useAllSales';
+import { usePermissions } from '@shared/hooks/use-permissions';
+import { PERMISSIONS } from '@shared/auth/permissions';
 
 export default function ClientsScreen() {
   const colors = useColors();
   const router = useRouter();
+  const { can } = usePermissions();
   const { data: clients = [] } = useClients();
   const { data: sales = [] } = useAllSales();
   const [search, setSearch] = useState('');
+  const canCreate = can(PERMISSIONS.CLIENTS_CREATE);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -104,11 +108,20 @@ export default function ClientsScreen() {
           <EmptyState
             icon="people"
             title="Nenhum cliente encontrado"
-            subtitle={search ? 'Tente outro termo de busca' : 'Conecte ao desktop para sincronizar dados'}
+            subtitle={search ? 'Tente outro termo de busca' : 'Nenhum cliente cadastrado'}
           />
         }
         showsVerticalScrollIndicator={false}
       />
+
+      {canCreate && (
+        <Pressable
+          onPress={() => router.push('/clients/new' as any)}
+          style={({ pressed }) => [styles.fab, { backgroundColor: colors.primary }, pressed && { opacity: 0.7 }]}
+        >
+          <MaterialIcons name="add" size={28} color="#fff" />
+        </Pressable>
+      )}
 
     </ScreenContainer>
   );
@@ -132,4 +145,5 @@ const styles = StyleSheet.create({
   tagsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
   totalBlock: { alignItems: 'flex-end', gap: 2 },
   totalValue: { fontSize: 13, fontWeight: '700' },
+  fab: { position: 'absolute', bottom: 24, right: 24, width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center', elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.25, shadowRadius: 6 },
 });

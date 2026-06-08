@@ -309,8 +309,12 @@ export interface DbClient {
   email: string | null;
   address: string | null;
   notes: string | null;
+  isDeleted?: number;
   createdAt: string;
   updatedAt: string;
+  syncStatus?: string | null;
+  syncError?: string | null;
+  syncErrorAt?: string | null;
 }
 
 export async function getClients(): Promise<DbClient[]> {
@@ -327,31 +331,54 @@ export async function getClientById(id: string): Promise<DbClient | undefined> {
 
 export async function saveClient(client: DbClient): Promise<DbClient> {
   const database = await getDb();
-  const existing = await getClientById(client.id);
+  const now = new Date().toISOString();
+  const existing = await database.getFirstAsync<{ id: string }>(
+    'SELECT id FROM clients WHERE id = ?', [client.id]
+  );
   if (existing) {
     await database.runAsync(
-      `UPDATE clients SET name = ?, document = ?, phone = ?, email = ?, 
-       address = ?, notes = ?, updatedAt = ? WHERE id = ?`,
+      `UPDATE clients SET name = ?, document = ?, phone = ?, email = ?,
+       address = ?, notes = ?, isDeleted = 0, updatedAt = ?, syncStatus = ? WHERE id = ?`,
       sanitizeParams([client.name, client.document, client.phone, client.email,
-       client.address, client.notes, client.updatedAt, client.id])
+       client.address, client.notes, now, 'pending', client.id])
     );
-    return client;
+    return { ...client, updatedAt: now, syncStatus: 'pending' };
   }
   await database.runAsync(
-    `INSERT INTO clients (id, name, document, phone, email, address, notes, createdAt, updatedAt) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO clients (id, name, document, phone, email, address, notes, isDeleted, createdAt, updatedAt, syncStatus)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)`,
     sanitizeParams([client.id, client.name, client.document, client.phone, client.email,
-     client.address, client.notes, client.createdAt, client.updatedAt])
+     client.address, client.notes, client.createdAt, now, 'pending'])
   );
-  return client;
+  return { ...client, updatedAt: now, isDeleted: 0, syncStatus: 'pending' };
 }
 
 export async function deleteClient(id: string): Promise<void> {
   const database = await getDb();
   await database.runAsync(
-    'UPDATE clients SET isDeleted = 1, updatedAt = ? WHERE id = ?',
-    [new Date().toISOString(), id]
+    'UPDATE clients SET isDeleted = 1, updatedAt = ?, syncStatus = ? WHERE id = ?',
+    [new Date().toISOString(), 'pending', id]
   );
+}
+
+export async function updateClientSyncStatus(
+  clientId: string,
+  syncStatus: string,
+  syncError?: string,
+): Promise<void> {
+  const database = await getDb();
+  const now = new Date().toISOString();
+  if (syncStatus === 'synced') {
+    await database.runAsync(
+      'UPDATE clients SET syncStatus = ?, syncError = NULL, syncErrorAt = NULL, updatedAt = ? WHERE id = ?',
+      [syncStatus, now, clientId]
+    );
+  } else {
+    await database.runAsync(
+      'UPDATE clients SET syncStatus = ?, syncError = ?, syncErrorAt = ?, updatedAt = ? WHERE id = ?',
+      [syncStatus, syncError || null, now, now, clientId]
+    );
+  }
 }
 
 // ============================================================
@@ -379,6 +406,8 @@ export interface DbSale {
   syncStatus: string | null;
   syncError: string | null;
   syncWarnings: string | null;
+  refundAmount: number | null;
+  returnProductsWithClient: number | null;
 }
 
 export async function getSales(): Promise<DbSale[]> {
@@ -403,22 +432,22 @@ export async function saveSale(sale: DbSale): Promise<DbSale> {
       `UPDATE sales SET description = ?, clientId = ?, clientName = ?, paymentType = ?, 
        installmentsCount = ?, subtotal = ?, discountType = ?, discountValue = ?, 
        totalAmount = ?, entryAmount = ?, entryPaymentType = ?, status = ?, saleDate = ?, firstInstallmentDate = ?, 
-       tagIds = ?, updatedAt = ?, syncStatus = ?, syncError = ?, syncWarnings = ? WHERE id = ?`,
+       tagIds = ?, updatedAt = ?, syncStatus = ?, syncError = ?, syncWarnings = ?, refundAmount = ?, returnProductsWithClient = ? WHERE id = ?`,
       sanitizeParams([sale.description, sale.clientId, sale.clientName, sale.paymentType,
        sale.installmentsCount, sale.subtotal, sale.discountType, sale.discountValue,
        sale.totalAmount, sale.entryAmount, sale.entryPaymentType, sale.status, sale.saleDate, sale.firstInstallmentDate,
-       sale.tagIds, sale.updatedAt, sale.syncStatus, sale.syncError, sale.syncWarnings, sale.id])
+       sale.tagIds, sale.updatedAt, sale.syncStatus, sale.syncError, sale.syncWarnings, sale.refundAmount, sale.returnProductsWithClient, sale.id])
     );
     return sale;
   }
   await database.runAsync(
     `INSERT INTO sales (id, description, clientId, clientName, paymentType, installmentsCount, 
      subtotal, discountType, discountValue, totalAmount, entryAmount, entryPaymentType, status, saleDate, firstInstallmentDate, 
-     tagIds, createdAt, updatedAt, syncStatus, syncError, syncWarnings) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+     tagIds, createdAt, updatedAt, syncStatus, syncError, syncWarnings, refundAmount, returnProductsWithClient) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     sanitizeParams([sale.id, sale.description, sale.clientId, sale.clientName, sale.paymentType,
      sale.installmentsCount, sale.subtotal, sale.discountType, sale.discountValue,
      sale.totalAmount, sale.entryAmount, sale.entryPaymentType, sale.status, sale.saleDate, sale.firstInstallmentDate,
-     sale.tagIds, sale.createdAt, sale.updatedAt, sale.syncStatus || 'pending', sale.syncError, sale.syncWarnings])
+     sale.tagIds, sale.createdAt, sale.updatedAt, sale.syncStatus || 'pending', sale.syncError, sale.syncWarnings, sale.refundAmount, sale.returnProductsWithClient])
   ); 
   return sale;
 }
@@ -772,22 +801,22 @@ export async function mergeClients(clients: any[]): Promise<void> {
     if (existing) {
       await database.runAsync(
         `UPDATE clients SET name = ?, document = ?, phone = ?, email = ?,
-         address = ?, notes = ?, updatedAt = ?, isDeleted = ? WHERE id = ?`,
+         address = ?, notes = ?, updatedAt = ?, isDeleted = ?, syncStatus = ? WHERE id = ?`,
         sanitizeParams([
           client.name, client.document || null, client.phone || null,
           client.email || null, client.address || null, client.notes || null,
-          client.updatedAt || new Date().toISOString(), isDeleted, client.id,
+          client.updatedAt || new Date().toISOString(), isDeleted, 'synced', client.id,
         ])
       );
     } else {
       await database.runAsync(
-        `INSERT INTO clients (id, name, document, phone, email, address, notes, createdAt, updatedAt, isDeleted)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO clients (id, name, document, phone, email, address, notes, createdAt, updatedAt, isDeleted, syncStatus)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         sanitizeParams([
           client.id, client.name, client.document || null, client.phone || null,
           client.email || null, client.address || null, client.notes || null,
           client.createdAt || new Date().toISOString(),
-          client.updatedAt || new Date().toISOString(), isDeleted,
+          client.updatedAt || new Date().toISOString(), isDeleted, 'synced',
         ])
       );
     }

@@ -35,7 +35,7 @@ export interface SyncState {
 }
 
 // Desktop sync protocol message types
-export type DesktopSyncMessageType = 'handshake' | 'handshake_ack' | 'auth_request' | 'auth_response' | 'pull' | 'pull_result' | 'sale' | 'ack' | 'error';
+export type DesktopSyncMessageType = 'handshake' | 'handshake_ack' | 'auth_request' | 'auth_response' | 'pull' | 'pull_result' | 'sale' | 'client' | 'ack' | 'error';
 
 export interface DesktopSyncMessage {
   type: DesktopSyncMessageType;
@@ -47,6 +47,7 @@ export interface DesktopSyncMessage {
   data?: any;
   timestamp?: string;
   saleId?: string;
+  clientId?: string;
   status?: 'ok' | 'error';
   warnings?: { productId: string; productName: string; available: number; quantity: number }[];
   message?: string;

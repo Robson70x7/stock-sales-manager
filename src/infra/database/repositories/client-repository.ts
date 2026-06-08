@@ -33,4 +33,8 @@ export class ClientRepository implements IClientRepository {
   async saveTags(clientId: string, tagIds: string[]): Promise<void> {
     await db.setClientTags(clientId, tagIds);
   }
+
+  async updateSyncStatus(clientId: string, syncStatus: string, syncError?: string): Promise<void> {
+    await db.updateClientSyncStatus(clientId, syncStatus, syncError);
+  }
 }

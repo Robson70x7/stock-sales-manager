@@ -51,11 +51,16 @@ export class SaleService {
     return sale;
   }
 
-  async cancel(id: string, returnStock?: boolean): Promise<Sale> {
+  async cancel(
+    id: string,
+    returnStock?: boolean,
+    refundAmount?: number | null,
+    returnProductsWithClient?: boolean | null,
+  ): Promise<Sale> {
     const sale = await this.saleRepo.findById(id);
     if (!sale) throw new SaleNotFoundError(id);
 
-    const updated = sale.cancel();
+    const updated = sale.cancel(refundAmount, returnProductsWithClient);
 
     if (returnStock !== false) {
       await this.stockRepo.deleteByReference(id);

@@ -25,6 +25,7 @@ interface SyncResult {
   clients: number;
   tags: number;
   suppliers: number;
+  clientsSent: number;
   sales: number;
 }
 
@@ -413,6 +414,10 @@ export function SyncModal({
                   <Text style={[styles.resultLabel, { color: colors.muted }]}>Vendas enviadas</Text>
                   <Text style={[styles.resultValue, { color: colors.foreground }]}>{syncResult.sales}</Text>
                 </View>
+                <View style={styles.resultRow}>
+                    <Text style={[styles.resultLabel, { color: colors.muted }]}>Clientes enviados</Text>
+                    <Text style={[styles.resultValue, { color: colors.foreground }]}>{syncResult.clientsSent}</Text>
+                  </View>
               </View>
             </View>
           )}

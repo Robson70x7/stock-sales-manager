@@ -63,6 +63,8 @@ export function useEditSale() {
         syncStatus: data.syncStatus ?? null,
         syncError: data.syncError ?? null,
         syncWarnings: data.syncWarnings ?? null,
+        refundAmount: (data as any).refundAmount ?? null,
+        returnProductsWithClient: (data as any).returnProductsWithClient ?? null,
       });
       return saleService.update(sale);
     },

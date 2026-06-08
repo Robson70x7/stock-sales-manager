@@ -13,8 +13,11 @@ export function useCancelSale() {
   );
 
   return useMutation({
-    mutationFn: ({ id, returnStock }: { id: string; returnStock?: boolean }) =>
-      saleService.cancel(id, returnStock),
+    mutationFn: ({
+      id, returnStock, refundAmount, returnProductsWithClient,
+    }: {
+      id: string; returnStock?: boolean; refundAmount?: number | null; returnProductsWithClient?: boolean | null;
+    }) => saleService.cancel(id, returnStock, refundAmount, returnProductsWithClient),
     onSuccess: (_data, { id }) => {
       queryClient.invalidateQueries({ queryKey: ['sales'] });
       queryClient.invalidateQueries({ queryKey: ['sale', id] });

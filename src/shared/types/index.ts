@@ -5,7 +5,7 @@
 
 export type PaymentType = 'cash' | 'pix' | 'credit_card' | 'debit_card';
 export type SaleStatus = 'pending' | 'partial' | 'paid' | 'refunded' | 'cancelled';
-export type InstallmentStatus = 'pending' | 'paid' | 'overdue';
+export type InstallmentStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
 export type StockMovementType = 'in' | 'out' | 'initial' | 'adjustment';
 export type SaleSyncStatus = 'pending' | 'synced' | 'failed';
 export type SaleItemStatus = 'active' | 'cancelled';

@@ -68,7 +68,17 @@ export const migrations: Migration[] = [
     "version": 13,
     "name": "sync_token",
     "sql": "-- ============================================================\n-- Migration: Add syncToken to active_session\n-- Version: 013\n-- Date: 2026-06-05\n-- Purpose: Store WebSocket JWT token in session for reauthentication\n-- ============================================================\n\nALTER TABLE active_session ADD COLUMN syncToken TEXT;"
+  },
+  {
+    "version": 14,
+    "name": "client_sync_columns",
+    "sql": "-- ============================================================\n-- Migration: Add sync columns to clients table\n-- Version: 014\n-- Date: 2026-06-08\n-- Purpose: Add syncStatus, syncError, syncErrorAt for client sync\n-- ============================================================\n\nALTER TABLE clients ADD COLUMN syncStatus TEXT DEFAULT 'synced';\nALTER TABLE clients ADD COLUMN syncError TEXT;\nALTER TABLE clients ADD COLUMN syncErrorAt TEXT;"
+  },
+  {
+    "version": 15,
+    "name": "cancel_fields",
+    "sql": "-- ============================================================\n-- Migration: Add cancel fields to sales\n-- Version: 015\n-- Date: 2026-06-08\n-- Purpose: Add refundAmount and returnProductsWithClient columns\n--          for sale cancellation flow with desktop sync\n-- ============================================================\n\nALTER TABLE sales ADD COLUMN refundAmount REAL;\nALTER TABLE sales ADD COLUMN returnProductsWithClient INTEGER;"
   }
 ];
 
-export const LATEST_VERSION = 13;
+export const LATEST_VERSION = 15;

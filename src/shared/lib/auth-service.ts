@@ -114,34 +114,46 @@ export class AuthService {
   }
 
   static async createSessionFromUser(
-    user: { id: string; name: string; username: string; roleName: string; permissions: string[] },
+    user: { id: string; name: string; username: string; roleName: string; permissions: string[]; passwordHash?: string },
     syncToken?: string,
   ): Promise<AuthenticatedUser> {
     const db = await getDb();
 
     const now = new Date().toISOString();
 
-    const role = await db.getFirstAsync<{ id: string }>(
+    let roleId: string;
+
+    const existingRole = await db.getFirstAsync<{ id: string }>(
       'SELECT id FROM roles WHERE name = ?',
       [user.roleName]
     );
-    const roleId = role?.id || '';
+
+    if (existingRole) {
+      roleId = existingRole.id;
+    } else {
+      roleId = generateId();
+      await db.runAsync(
+        `INSERT INTO roles (id, name, description, isSystem, createdAt) VALUES (?, ?, ?, 0, ?)`,
+        [roleId, user.roleName, `Função sincronizada do desktop`, now]
+      );
+    }
 
     const existingUser = await db.getFirstAsync<{ id: string }>(
       'SELECT id FROM users WHERE id = ?',
       [user.id]
     );
 
+    const passwordHash = user.passwordHash || '';
     if (existingUser) {
       await db.runAsync(
-        `UPDATE users SET name = ?, username = ?, roleId = ?, updatedAt = ? WHERE id = ?`,
-        [user.name, user.username, roleId, now, user.id]
+        `UPDATE users SET name = ?, username = ?, passwordHash = ?, roleId = ?, updatedAt = ? WHERE id = ?`,
+        [user.name, user.username, passwordHash, roleId, now, user.id]
       );
     } else {
       await db.runAsync(
         `INSERT INTO users (id, name, username, passwordHash, roleId, isActive, mustChangePassword, createdAt, updatedAt)
-         VALUES (?, ?, ?, '', ?, 1, 0, ?, ?)`,
-        [user.id, user.name, user.username, roleId, now, now]
+         VALUES (?, ?, ?, ?, ?, 1, 0, ?, ?)`,
+        [user.id, user.name, user.username, passwordHash, roleId, now, now]
       );
     }
 
@@ -155,6 +167,22 @@ export class AuthService {
       'UPDATE users SET lastLoginAt = ? WHERE id = ?',
       [now, user.id]
     );
+
+    // Persist permissions in role_permissions so getSession() -> buildPermissions() works
+    if (user.permissions && user.permissions.length > 0) {
+      await db.runAsync('DELETE FROM role_permissions WHERE roleId = ?', [roleId]);
+      for (const permKey of user.permissions) {
+        const perm = await db.getFirstAsync<{ id: string }>(
+          'SELECT id FROM permissions WHERE key = ?', [permKey]
+        );
+        if (perm) {
+          await db.runAsync(
+            'INSERT OR IGNORE INTO role_permissions (roleId, permissionId) VALUES (?, ?)',
+            [roleId, perm.id]
+          );
+        }
+      }
+    }
 
     return {
       id: user.id,

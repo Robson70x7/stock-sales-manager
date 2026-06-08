@@ -5,29 +5,24 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { useSale } from '@/hooks/useSale';
 import { useTags } from '@/hooks/useTags';
-import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
 import { useCancelSale } from '@/hooks/useCancelSale';
 import { useUpdateInstallment } from '@/hooks/useUpdateInstallment';
 import { TagChip } from '@/components/ui/TagChip';
 import { SaleStatusBadge, InstallmentStatusBadge } from '@/components/ui/StatusBadge';
-import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { CancelWizard } from '@/components/ui/CancelWizard';
 import { formatCurrency, formatDate, getPaymentTypeLabel } from '@shared/lib/utils';
 import { Installment } from '@shared/types';
 import * as Haptics from 'expo-haptics';
 
 export default function SaleDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data: settings } = useSettings();
   const { data: sale, isLoading } = useSale(id);
   const { data: allTags = [] } = useTags();
   const { mutateAsync: cancelSale } = useCancelSale();
   const { mutateAsync: updateInstallment } = useUpdateInstallment();
-  const { mutateAsync: updateSettings } = useUpdateSettings();
   const colors = useColors();
   const router = useRouter();
-  const [showDelete, setShowDelete] = useState(false);
-  const [showReturnStock, setShowReturnStock] = useState(false);
-  const [dontAskAgain, setDontAskAgain] = useState(false);
+  const [showCancelWizard, setShowCancelWizard] = useState(false);
 
   if (isLoading) return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -45,20 +40,18 @@ export default function SaleDetailScreen() {
   const paidAmount = sale.installments.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.amount, 0);
   const pendingAmount = sale.totalAmount - paidAmount;
 
-  const handleCancel = async (returnStock: boolean = false) => {
-    if (dontAskAgain) {
-      await updateSettings({ askReturnStockOnDelete: false });
-    }
-    await cancelSale({ id: sale.id, returnStock });
+  const handleCancel = async (params: { refundAmount: number | null; returnProductsWithClient: boolean }) => {
+    await cancelSale({
+      id: sale.id,
+      returnStock: params.returnProductsWithClient,
+      refundAmount: params.refundAmount,
+      returnProductsWithClient: params.returnProductsWithClient,
+    });
     router.back();
   };
 
   const handleCancelPress = () => {
-    if (settings?.askReturnStockOnDelete ?? true) {
-      setShowReturnStock(true);
-    } else {
-      setShowDelete(true);
-    }
+    setShowCancelWizard(true);
   };
 
   const toggleInstallment = async (installment: Installment) => {
@@ -242,34 +235,11 @@ export default function SaleDetailScreen() {
         </View>
       </View>
 
-      <ConfirmDialog
-        visible={showReturnStock}
-        title="Devolver ao Estoque?"
-        message="Deseja devolver os itens desta venda ao estoque?"
-        confirmLabel="Devolver"
-        onConfirm={() => {
-          setShowReturnStock(false);
-          handleCancel(true);
-        }}
-        onCancel={() => {
-          setShowReturnStock(false);
-          setShowDelete(true);
-        }}
-        checkbox={{
-          label: "Não perguntar novamente",
-          checked: dontAskAgain,
-          onCheckedChange: setDontAskAgain,
-        }}
-      />
-
-      <ConfirmDialog
-        visible={showDelete}
-        title="Cancelar Venda"
-        message={`Deseja cancelar esta venda? O status será alterado para cancelado.`}
-        confirmLabel="Cancelar"
-        destructive
-        onConfirm={() => handleCancel(false)}
-        onCancel={() => setShowDelete(false)}
+      <CancelWizard
+        visible={showCancelWizard}
+        sale={sale}
+        onConfirm={handleCancel}
+        onCancel={() => setShowCancelWizard(false)}
       />
     </ScrollView>
   );

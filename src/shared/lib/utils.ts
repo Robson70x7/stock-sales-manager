@@ -97,6 +97,7 @@ export function getInstallmentStatusLabel(status: InstallmentStatus): string {
     pending: 'Pendente',
     paid: 'Pago',
     overdue: 'Vencido',
+    cancelled: 'Cancelado',
   };
   return labels[status] || status;
 }
@@ -119,6 +120,7 @@ export function getInstallmentStatusColor(status: InstallmentStatus): string {
     pending: '#D97706',
     paid: '#16A34A',
     overdue: '#DC2626',
+    cancelled: '#6B7280',
   };
   return colors[status] || '#64748B';
 }

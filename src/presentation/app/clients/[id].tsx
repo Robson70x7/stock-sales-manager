@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
+import React, { useCallback } from 'react';
+import { View, Text, ScrollView, Pressable, StyleSheet, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColors } from '@/hooks/use-colors';
 import { TagChip } from '@/components/ui/TagChip';
@@ -9,15 +10,46 @@ import { formatCurrency, formatDate, getInitials } from '@shared/lib/utils';
 import { useClient } from '@/hooks/useClient';
 import { useAllSales } from '@/hooks/useAllSales';
 import { useTags } from '@/hooks/useTags';
+import { usePermissions } from '@shared/hooks/use-permissions';
+import { PERMISSIONS } from '@shared/auth/permissions';
+import { ClientService } from '@application/services/client-service';
+import { ClientRepository } from '@infra/database/repositories/client-repository';
 
 export default function ClientDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const colors = useColors();
   const router = useRouter();
+  const queryClient = useQueryClient();
+  const { can } = usePermissions();
 
   const { data: client, isLoading } = useClient(id);
   const { data: sales = [] } = useAllSales();
   const { data: tags = [] } = useTags();
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      const service = new ClientService(new ClientRepository());
+      await service.delete(id);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+      router.back();
+    },
+  });
+
+  const handleDelete = useCallback(() => {
+    Alert.alert(
+      'Excluir Cliente',
+      'Tem certeza que deseja excluir este cliente?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Excluir', style: 'destructive', onPress: () => deleteMutation.mutate() },
+      ]
+    );
+  }, [deleteMutation]);
+
+  const canEdit = can(PERMISSIONS.CLIENTS_CREATE);
+  const canDelete = can(PERMISSIONS.CLIENTS_DELETE);
 
   if (isLoading) return (
     <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
@@ -123,12 +155,31 @@ export default function ClientDetailScreen() {
           </View>
         )}
 
-        <View style={[styles.infoCard, { backgroundColor: '#1E3A5F', borderColor: '#3B82F6' }]}>
-          <MaterialIcons name="desktop-mac" size={16} color="#3B82F6" />
-          <Text style={{ color: '#93C5FD', fontSize: 13, flex: 1 }}>
-            Gerenciar no Desktop — Os dados de clientes são sincronizados do sistema desktop
-          </Text>
-        </View>
+        {(canEdit || canDelete) && (
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            {canEdit && (
+              <Pressable
+                onPress={() => router.push(`/clients/edit/${id}` as any)}
+                style={({ pressed }) => [styles.actionBtn, { backgroundColor: colors.primary + '20', borderColor: colors.primary + '40' }, pressed && { opacity: 0.7 }]}
+              >
+                <MaterialIcons name="edit" size={18} color={colors.primary} />
+                <Text style={{ color: colors.primary, fontSize: 14, fontWeight: '600' }}>Editar</Text>
+              </Pressable>
+            )}
+            {canDelete && (
+              <Pressable
+                onPress={handleDelete}
+                disabled={deleteMutation.isPending}
+                style={({ pressed }) => [styles.actionBtn, { backgroundColor: '#ef444420', borderColor: '#ef444440' }, pressed && { opacity: 0.7 }]}
+              >
+                <MaterialIcons name="delete" size={18} color="#ef4444" />
+                <Text style={{ color: '#ef4444', fontSize: 14, fontWeight: '600' }}>
+                  {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+                </Text>
+              </Pressable>
+            )}
+          </View>
+        )}
 
         <Text style={[styles.dateText, { color: colors.muted }]}>Cadastrado em {formatDate(client.createdAt)}</Text>
       </View>
@@ -163,4 +214,5 @@ const styles = StyleSheet.create({
   saleRight: { alignItems: 'flex-end', gap: 4 },
   saleAmount: { fontSize: 14, fontWeight: '600' },
   dateText: { fontSize: 12, textAlign: 'center' },
+  actionBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 12, paddingVertical: 12, borderWidth: 0.5 },
 });

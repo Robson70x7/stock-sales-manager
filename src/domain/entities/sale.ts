@@ -125,6 +125,8 @@ export interface SaleProps {
   syncStatus: SaleSyncStatus | null;
   syncError: string | null;
   syncWarnings: Array<{ productId: string; productName: string; available: number; quantity: number }> | null;
+  refundAmount: number | null;
+  returnProductsWithClient: boolean | null;
 }
 
 export interface CreateSaleInput {
@@ -180,6 +182,8 @@ export class Sale {
   readonly syncStatus: SaleSyncStatus | null;
   readonly syncError: string | null;
   readonly syncWarnings: Array<{ productId: string; productName: string; available: number; quantity: number }> | null;
+  readonly refundAmount: number | null;
+  readonly returnProductsWithClient: boolean | null;
 
   private constructor(props: SaleProps) {
     this.id = props.id;
@@ -205,6 +209,8 @@ export class Sale {
     this.syncStatus = props.syncStatus;
     this.syncError = props.syncError;
     this.syncWarnings = props.syncWarnings;
+    this.refundAmount = props.refundAmount ?? null;
+    this.returnProductsWithClient = props.returnProductsWithClient ?? null;
   }
 
   static fromDb(
@@ -217,6 +223,7 @@ export class Sale {
       firstInstallmentDate: string | null; tagIds: string;
       createdAt: string; updatedAt: string;
       syncStatus: string | null; syncError: string | null; syncWarnings: string | null;
+      refundAmount: number | null; returnProductsWithClient: number | null;
     },
     items: SaleItem[],
     installments: Installment[],
@@ -245,6 +252,8 @@ export class Sale {
       syncStatus: (row.syncStatus as SaleSyncStatus) || null,
       syncError: row.syncError || null,
       syncWarnings: row.syncWarnings ? JSON.parse(row.syncWarnings) : null,
+      refundAmount: row.refundAmount ?? null,
+      returnProductsWithClient: row.returnProductsWithClient ? row.returnProductsWithClient === 1 : null,
     });
   }
 
@@ -295,6 +304,8 @@ export class Sale {
       syncStatus: 'pending',
       syncError: null,
       syncWarnings: null,
+      refundAmount: null,
+      returnProductsWithClient: null,
     });
   }
 
@@ -310,12 +321,22 @@ export class Sale {
     return this.status === 'cancelled';
   }
 
-  cancel(): Sale {
+  cancel(refundAmount?: number | null, returnProductsWithClient?: boolean | null): Sale {
+    const now = new Date().toISOString();
+    const updatedInstallments = this.installments.map(inst => {
+      if (inst.status === 'pending' || inst.status === 'overdue') {
+        return inst.cancel();
+      }
+      return inst;
+    });
     return new Sale({
       ...this,
       status: 'cancelled',
+      installments: updatedInstallments,
       syncStatus: this.syncStatus === 'synced' ? 'pending' : this.syncStatus,
-      updatedAt: new Date().toISOString(),
+      refundAmount: refundAmount ?? null,
+      returnProductsWithClient: returnProductsWithClient ?? null,
+      updatedAt: now,
     });
   }
 
@@ -328,6 +349,7 @@ export class Sale {
     firstInstallmentDate: string | null; tagIds: string;
     createdAt: string; updatedAt: string;
     syncStatus: string | null; syncError: string | null; syncWarnings: string | null;
+    refundAmount: number | null; returnProductsWithClient: number | null;
   } {
     return {
       id: this.id,
@@ -351,6 +373,8 @@ export class Sale {
       syncStatus: this.syncStatus,
       syncError: this.syncError,
       syncWarnings: this.syncWarnings ? JSON.stringify(this.syncWarnings) : null,
+      refundAmount: this.refundAmount,
+      returnProductsWithClient: this.returnProductsWithClient ? 1 : 0,
     };
   }
 
